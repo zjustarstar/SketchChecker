@@ -87,7 +87,7 @@ def small_area_detection(file, maker_img, outpath, area_threshold, binary_thresh
     print("二值化阈值:"+str(ret), "  图片:", filename, "  面积小于"+str(area_threshold)+"的区域个数为:", count)
 
     mid_img_name = os.path.join(outpath, onlyfilename + "_sdmid" + "_" + str(count) + extension)
-    cv2.imencode(extension, img)[1].tofile(mid_img_name)
+    # cv2.imencode(extension, img)[1].tofile(mid_img_name)
 
     # dst_img_name = os.path.join(outpath, onlyfilename + "_sddst" + extension)
     # cv2.imencode(extension, img_copy)[1].tofile(dst_img_name)
