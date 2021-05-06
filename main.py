@@ -5,10 +5,10 @@ import thinLineDetection as td
 import unclosedLineDetection as ud
 
 
-# input_path = "F:\\PythonProj\\SketchChecker\\testimage\\"
-# output_folder = "result\\"
-input_path = "/home/cgim/wushukai/code/LeXin/SketchChecker-0506/testimage"
-output_folder = "result"
+input_path = "F:\\PythonProj\\SketchChecker\\testimage\\"
+output_folder = "result\\"
+# input_path = "/home/cgim/wushukai/code/LeXin/SketchChecker-0506/testimage"
+# output_folder = "result"
 
 # 在当前目录自动生成用于保存的文件夹
 if not os.path.exists(os.path.join(input_path, output_folder)):
@@ -18,7 +18,6 @@ imgfile1 = glob.glob(os.path.join(input_path, "*.png"))
 imgfile2 = glob.glob(os.path.join(input_path, "*.jpg"))
 imgfile = imgfile1 + imgfile2
 totalfile = len(imgfile)
-
 
 i = 0
 for f in imgfile:
