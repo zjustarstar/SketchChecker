@@ -4,6 +4,29 @@ import numpy as np
 
 pixelThreshold = 480  # 轮廓内部的像素点个数阈值
 
+
+def inverse_white(path):
+    # 输入为png的路径
+    img = cv2.imdecode(np.fromfile(path, dtype=np.uint8), -1)
+    # img = cv2.imread(path, -1)
+    if img.shape[2] == 3:
+        return img
+
+    for i in range(img.shape[0]):
+        for j in range(img.shape[1]):
+            if img[i][j][3] == 0:
+                img[i][j][0] = 255
+                img[i][j][1] = 255
+                img[i][j][2] = 255
+
+    imgnew = np.zeros((img.shape[0], img.shape[1], 3), np.uint8)
+    for k in range(3):
+        for i in range(img.shape[0]):
+            for j in range(img.shape[1]):
+                imgnew[i][j][k] = img[i][j][k]
+    return imgnew
+
+
 def get_contour_pixel_number(img, points):
     """统计轮廓内部的像素个数
     Parameters:
@@ -37,12 +60,18 @@ def small_area_detection(file, outpath, area_threshold, binary_threshold):
 
     (filepath, filename) = os.path.split(file)
     (onlyfilename, extension) = os.path.splitext(filename)
-    mid_img_name = outpath + onlyfilename + "_mid" + extension
-    dst_img_name = outpath + onlyfilename + "_dst" + extension
+    mid_img_name = os.path.join(outpath, onlyfilename + "_mid" + extension)
+    dst_img_name = os.path.join(outpath, onlyfilename + "_dst" + extension)
 
     # imdecode/encode可以读取/保存含有中文名的文件
     #img = cv2.imdecode(np.fromfile(file, dtype=np.uint8), -1)
-    img = cv2.imread(file)
+    # img = cv2.imread(file)
+
+    if file.endswith("png"):
+        img = inverse_white(file)
+    else:
+        img = cv2.imread(file)
+
     img_copy = img.copy()
     if len(img.shape) < 3:
         gray = img
@@ -64,8 +93,10 @@ def small_area_detection(file, outpath, area_threshold, binary_threshold):
 
     # cv2.imencode(extension, img)[1].tofile(mid_img_name)
     # cv2.imencode(extension, img_copy)[1].tofile(dst_img_name)
-    cv2.imwrite(mid_img_name, img)
-    cv2.imwrite(dst_img_name, img_copy)
+    cv2.imencode(extension, img)[1].tofile(mid_img_name)
+    cv2.imencode(extension, img_copy)[1].tofile(dst_img_name)
+    # cv2.imwrite(mid_img_name, img)
+    # cv2.imwrite(dst_img_name, img_copy)
 
 
 # if __name__ == '__main__':

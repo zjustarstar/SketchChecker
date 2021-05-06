@@ -2,6 +2,31 @@ import cv2
 import os
 import numpy as np
 
+pixel_threshold = 10  # 轮廓内部的像素点个数阈值
+binary_threshold = 50  # 二值化阈值
+
+
+def inverse_white(path):
+    # 输入为png的路径
+    # img = cv2.imread(path, -1)
+    img = cv2.imdecode(np.fromfile(path, dtype=np.uint8), -1)
+    if img.shape[2] == 3:
+        return img
+
+    for i in range(img.shape[0]):
+        for j in range(img.shape[1]):
+            if img[i][j][3] == 0:
+                img[i][j][0] = 255
+                img[i][j][1] = 255
+                img[i][j][2] = 255
+
+    imgnew = np.zeros((img.shape[0], img.shape[1], 3), np.uint8)
+    for k in range(3):
+        for i in range(img.shape[0]):
+            for j in range(img.shape[1]):
+                imgnew[i][j][k] = img[i][j][k]
+    return imgnew
+
 
 def get_contour_pixel_number(img, points):
     """统计轮廓内部的像素个数
@@ -20,7 +45,7 @@ def get_contour_pixel_number(img, points):
     return pixel_numbers
 
 
-def thin_line_detection(src_img_dir, dst_img_dir, area_threshold, binary_threshold):
+def thin_line_detection(file, outpath, area_threshold, binary_threshold):
     """检测细线
     Parameters:
         Input:
@@ -31,39 +56,47 @@ def thin_line_detection(src_img_dir, dst_img_dir, area_threshold, binary_thresho
         Output:
             红色填充的图片和黑色填充的图片
     """
-    for file in os.listdir(src_img_dir):
+    (filepath, filename) = os.path.split(file)
+    (onlyfilename, extension) = os.path.splitext(filename)
+    # mid_img_name = os.path.join(outpath, onlyfilename + "_mid" + extension)
+    dst_img_name = os.path.join(outpath, onlyfilename + "_dst" + extension)
 
-        src_img_name = os.path.join(src_img_dir, file)
-        dst_img_name = os.path.join(dst_img_dir, file)
+    # imdecode/encode可以读取/保存含有中文名的文件
+    # img = cv2.imdecode(np.fromfile(file, dtype=np.uint8), -1)
+    # img = cv2.imread(file)
 
-        img = cv2.imread(src_img_name)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        ret, binary = cv2.threshold(gray, binary_threshold, 255, cv2.THRESH_BINARY)
+    if file.endswith("png"):
+        img = inverse_white(file)
+    else:
+        img = cv2.imread(file)
 
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))  # 定义结构元素的形状和大小
-        binary = cv2.erode(binary, kernel)  # 腐蚀
-        binary = cv2.dilate(binary, kernel)  # 膨胀
-        contours, hierarchy = cv2.findContours(binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    ret, binary = cv2.threshold(gray, binary_threshold, 255, cv2.THRESH_BINARY)
 
-        count = 0  # 统计不符合要求的区域个数
-        # 计算每个轮廓
-        for i in contours:
-            area = get_contour_pixel_number(binary, [i])
-            if area <= area_threshold:
-                count += 1
-                cv2.fillPoly(img, [i], (0, 0, 255))
-        print("二值化阈值:"+str(binary_threshold), "  图片:", src_img_name, "  面积小于"+str(area_threshold)+"的区域个数为:", count)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))  # 定义结构元素的形状和大小
+    binary = cv2.erode(binary, kernel)  # 腐蚀
+    binary = cv2.dilate(binary, kernel)  # 膨胀
+    contours, hierarchy = cv2.findContours(binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
-        cv2.imwrite(dst_img_name, img)
+    count = 0  # 统计不符合要求的区域个数
+    # 计算每个轮廓
+    for i in contours:
+        area = get_contour_pixel_number(binary, [i])
+        if area <= area_threshold:
+            count += 1
+            cv2.fillPoly(img, [i], (0, 0, 255))
+    print("二值化阈值:"+str(binary_threshold), "  图片:", filename, "  面积小于"+str(area_threshold)+"的区域个数为:", count)
 
+    # cv2.imwrite(dst_img_name, img)
+    cv2.imencode(extension, img)[1].tofile(dst_img_name)
 
-if __name__ == '__main__':
-    src_img_dir = "thinLineDetection/src"  # 源目录
-    dst_img_dir = "thinLineDetection/dst"  # 目标目录
-
-    pixel_threshold = 10  # 轮廓内部的像素点个数阈值
-    binary_threshold = 50  # 二值化阈值
-    thin_line_detection(src_img_dir, dst_img_dir, pixel_threshold, binary_threshold)
+# if __name__ == '__main__':
+#     src_img_dir = "thinLineDetection/src"  # 源目录
+#     dst_img_dir = "thinLineDetection/dst"  # 目标目录
+#
+#     pixel_threshold = 10  # 轮廓内部的像素点个数阈值
+#     binary_threshold = 50  # 二值化阈值
+#     thin_line_detection(src_img_dir, dst_img_dir, pixel_threshold, binary_threshold)
 
 
 
