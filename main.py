@@ -26,14 +26,15 @@ for f in imgfile:
     (shotname, extension) = os.path.splitext(filename)
     print("当前正在处理 %d/%d :%s" % (i, totalfile, filename))
 
+    # 细线化检测
+    print("开始细线化检测")
+    maker_img = td.thin_line_detection(f, os.path.join(input_path, output_folder), 10, 50)
+
     # 小区域检测
     print("开始小区域检测")
+    maker_img2 = sd.small_area_detection(f, maker_img, os.path.join(input_path, output_folder), 20, 50)
 
-    pixelThreshold = 50  # 轮廓内部的像素点个数阈值
-    binaryThreshold = 10  # 二值化阈值
-    sd.small_area_detection(f, os.path.join(input_path, output_folder), pixelThreshold, binaryThreshold)
-
-    # td.thin_line_detection(f, os.path.join(input_path, output_folder), pixelThreshold, binaryThreshold)
-    # ud.unclosed_line_detection(f, os.path.join(input_path, output_folder), 128, 7, 20)
+    print("开始未闭合线头检测")
+    ud.unclosed_line_detection(f, maker_img2, os.path.join(input_path, output_folder), 128, 7, 20)
 
 print("finish")

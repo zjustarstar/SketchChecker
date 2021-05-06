@@ -3,9 +3,9 @@ import os
 import numpy as np
 from skimage import morphology
 
-binary_threshold = 128  # 二值化阈值
-solid_window_size = 7  # 判断是否是实心区域的窗口大小
-search_num = 20  # 沿着边缘节点反向往回搜索的次数 这个值越高，未闭合的线头检测的越干净
+# binary_threshold = 128  # 二值化阈值
+# solid_window_size = 7  # 判断是否是实心区域的窗口大小
+# search_num = 20  # 沿着边缘节点反向往回搜索的次数 这个值越高，未闭合的线头检测的越干净
 
 def inverse_white(path):
     # 输入为png的路径
@@ -153,13 +153,12 @@ def get_unclosed_pixel_points(binary, skeleton, solid_window_size, search_num):
     return temp_isolated_points
 
 
-def unclosed_line_detection(file, outpath, binary_threshold=128, solid_window_size=7, search_num=20):
+def unclosed_line_detection(file, mark_img, outpath, binary_threshold=128, solid_window_size=7, search_num=20):
     """
     Parameters:
         Input:
             src_img_dir: 输入图片路径
-            thin_img_dir: 输出细化图片路径
-            dst_img_dir: 输出图片路径
+            mark_img: 在该图上做标记
             area_threshold: 轮廓中最小像素个数
             binary_threshold：二值化阈值
             solid_window_size: 判断是否是实心区域的窗口大小
@@ -171,8 +170,8 @@ def unclosed_line_detection(file, outpath, binary_threshold=128, solid_window_si
 
     (filepath, filename) = os.path.split(file)
     (onlyfilename, extension) = os.path.splitext(filename)
-    mid_img_name = os.path.join(outpath, onlyfilename + "_mid" + extension)
-    dst_img_name = os.path.join(outpath, onlyfilename + "_dst" + extension)
+    mid_img_name = os.path.join(outpath, onlyfilename + "_udmid" + extension)
+    dst_img_name = os.path.join(outpath, onlyfilename + "_marker" + extension)
 
     # imdecode/encode可以读取/保存含有中文名的文件
     # img = cv2.imdecode(np.fromfile(file, dtype=np.uint8), -1)
@@ -192,27 +191,9 @@ def unclosed_line_detection(file, outpath, binary_threshold=128, solid_window_si
 
     for i in range(len(points)):
         cv2.circle(skeleton, (points[i][1], points[i][0]), 10, 255, 2)
-        cv2.circle(img, (points[i][1], points[i][0]), 10, (0, 0, 255), 2)
-        # cv2.circle(img, (points[i][1], points[i][0]), 1, (0, 0, 255), -1)
+        cv2.circle(mark_img, (points[i][1], points[i][0]), 10, (255, 0, 0), 2)
 
-    # cv2.imwrite(mid_img_name, skeleton)
-    # cv2.imwrite(dst_img_name, img)
-
-    cv2.imencode(extension, skeleton)[1].tofile(mid_img_name)
-    cv2.imencode(extension, img)[1].tofile(dst_img_name)
+    # cv2.imencode(extension, skeleton)[1].tofile(mid_img_name)
+    cv2.imencode(extension, mark_img)[1].tofile(dst_img_name)
 
     print("  图片:", filename, "  不闭合点的个数为：", len(points))
-
-
-# if __name__ == '__main__':
-#     src_img_dir = "/home/cgim/wushukai/code/LeXin/LineDetection/unclosedLineDetection/src"  # 源目录
-#     thin_img_dir = "/home/cgim/wushukai/code/LeXin/LineDetection/unclosedLineDetection/thin"  # 细化图片目录
-#     dst_img_dir = "/home/cgim/wushukai/code/LeXin/LineDetection/unclosedLineDetection/dst"  # 目标目录
-#
-#     binary_threshold = 128  # 二值化阈值
-#     solid_window_size = 7  # 判断是否是实心区域的窗口大小
-#     search_num = 20  # 沿着边缘节点反向往回搜索的次数 这个值越高，未闭合的线头检测的越干净
-#     unclosed_line_detection(src_img_dir, thin_img_dir, dst_img_dir, binary_threshold, solid_window_size, search_num)
-
-
-
