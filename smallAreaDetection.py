@@ -71,6 +71,8 @@ def small_area_detection(file, maker_img, outpath, area_threshold, binary_thresh
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     #ret, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     ret, binary = cv2.threshold(gray, binary_threshold, 255, cv2.THRESH_BINARY)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))  # 定义结构元素的形状和大小
+    binary = cv2.dilate(binary, kernel)  # 膨胀
     # cv2.imencode(extension, binary)[1].tofile(temp_img)
 
     contours, hierarchy = cv2.findContours(binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
