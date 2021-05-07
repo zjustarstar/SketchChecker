@@ -153,25 +153,24 @@ def get_unclosed_pixel_points(binary, skeleton, solid_window_size, search_num):
     return temp_isolated_points
 
 
-def unclosed_line_detection(file, mark_img, outpath, binary_threshold=128, solid_window_size=7, search_num=20):
+def unclosed_line_detection(file, mark_img, outpath, binary_threshold=128,
+                            solid_window_size=7, search_num=20, debug=False):
     """
     Parameters:
         Input:
             src_img_dir: 输入图片路径
             mark_img: 在该图上做标记
-            area_threshold: 轮廓中最小像素个数
             binary_threshold：二值化阈值
             solid_window_size: 判断是否是实心区域的窗口大小
             search_num: 沿着边缘节点反向往回搜索的次数
-
+            debug: 调试模式,在该模式下，可以生成一些中间结果图
         Output:
             骨架图和原图的标注结果
     """
 
     (filepath, filename) = os.path.split(file)
     (onlyfilename, extension) = os.path.splitext(filename)
-    mid_img_name = os.path.join(outpath, onlyfilename + "_udmid" + extension)
-    dst_img_name = os.path.join(outpath, onlyfilename + "_marker" + extension)
+
 
     # imdecode/encode可以读取/保存含有中文名的文件
     # img = cv2.imdecode(np.fromfile(file, dtype=np.uint8), -1)
@@ -190,10 +189,13 @@ def unclosed_line_detection(file, mark_img, outpath, binary_threshold=128, solid
     points = get_unclosed_pixel_points(binary, skeleton, solid_window_size, search_num)  # 获取符合要求的点
 
     for i in range(len(points)):
-        cv2.circle(skeleton, (points[i][1], points[i][0]), 10, 255, 2)
-        cv2.circle(mark_img, (points[i][1], points[i][0]), 10, (255, 0, 0), 2)
+        cv2.circle(skeleton, (points[i][1], points[i][0]), 13, 255, 2)
+        cv2.circle(mark_img, (points[i][1], points[i][0]), 13, (255, 0, 0), 2)
 
-    # cv2.imencode(extension, skeleton)[1].tofile(mid_img_name)
-    cv2.imencode(extension, mark_img)[1].tofile(dst_img_name)
+    if debug:
+        mid_img_name = os.path.join(outpath, onlyfilename + "_ud_skeleton" + extension)
+        cv2.imencode(extension, skeleton)[1].tofile(mid_img_name)
 
     print("  图片:", filename, "  不闭合点的个数为：", len(points))
+
+    return mark_img
