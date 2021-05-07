@@ -45,7 +45,7 @@ def get_contour_pixel_number(img, points):
     return pixel_numbers
 
 
-def thin_line_detection(file, outpath, area_threshold, binary_threshold):
+def thin_line_detection(file, outpath, binary_threshold):
     """检测细线
     Parameters:
         Input:
@@ -69,18 +69,18 @@ def thin_line_detection(file, outpath, area_threshold, binary_threshold):
     ret, binary = cv2.threshold(gray, binary_threshold, 255, cv2.THRESH_BINARY)
 
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))  # 定义结构元素的形状和大小
-    binary = cv2.erode(binary, kernel)  # 腐蚀
-    binary = cv2.dilate(binary, kernel)  # 膨胀
-    contours, hierarchy = cv2.findContours(binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+    binary1 = cv2.dilate(binary, kernel)  # 膨胀
+    binary1 = cv2.erode(binary1, kernel)  # 腐蚀
+    binary1 = cv2.erode(binary1, kernel)  # 腐蚀
+    res = binary1 - binary
 
-    count = 0  # 统计不符合要求的区域个数
-    # 计算每个轮廓
-    for i in contours:
-        area = get_contour_pixel_number(binary, [i])
-        if area <= area_threshold:
-            count += 1
-            cv2.fillPoly(img, [i], (0, 255, 0))
-    print("二值化阈值:"+str(binary_threshold), "  图片:", filename, "  面积小于"+str(area_threshold)+"的区域个数为:", count)
+    res[res < 128] = 0  # 经过上述操作后可能存在值为1、2的像素点, 过滤掉
+
+    none_zero_indexes = list(zip(*np.nonzero(res)))  # 获取roi区域非0元素的坐标
+    for i in range(len(none_zero_indexes)):
+        img[none_zero_indexes[i][0], none_zero_indexes[i][1], 0] = 0
+        img[none_zero_indexes[i][0], none_zero_indexes[i][1], 1] = 0
+        img[none_zero_indexes[i][0], none_zero_indexes[i][1], 2] = 255
 
     # cv2.imencode(extension, img)[1].tofile(dst_img_name)
 
