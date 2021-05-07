@@ -5,9 +5,11 @@ import thinLineDetection as td
 import unclosedLineDetection as ud
 
 
-input_path = "F:\\PythonProj\\SketchChecker\\testimage\\"
-output_folder = "result\\"
-# input_path = "/home/cgim/wushukai/code/LeXin/SketchChecker-0506/testimage"
+# input_path = "F:\\PythonProj\\SketchChecker\\testimage\\"
+# output_folder = "result\\"
+input_path = "/home/cgim/wushukai/code/LeXin/SketchChecker-0506/testimage"
+output_folder = "result"
+# input_path = "/home/cgim/wushukai/code/LeXin/LineDetection/thinLineDetection/src"
 # output_folder = "result"
 
 # 在当前目录自动生成用于保存的文件夹
@@ -28,7 +30,7 @@ for f in imgfile:
 
     # 细线化检测
     print("开始细线化检测")
-    maker_img = td.thin_line_detection(f, os.path.join(input_path, output_folder), 10, 50)
+    maker_img = td.thin_line_detection(f, os.path.join(input_path, output_folder), 50)
 
     # 小区域检测
     print("开始小区域检测")
