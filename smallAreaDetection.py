@@ -4,27 +4,6 @@ import numpy as np
 import copy
 
 
-def inverse_white(path):
-    # 输入为png的路径
-    img = cv2.imdecode(np.fromfile(path, dtype=np.uint8), -1)
-    if img.shape[2] == 3:
-        return img
-
-    for i in range(img.shape[0]):
-        for j in range(img.shape[1]):
-            if img[i][j][3] == 0:
-                img[i][j][0] = 255
-                img[i][j][1] = 255
-                img[i][j][2] = 255
-
-    imgnew = np.zeros((img.shape[0], img.shape[1], 3), np.uint8)
-    for k in range(3):
-        for i in range(img.shape[0]):
-            for j in range(img.shape[1]):
-                imgnew[i][j][k] = img[i][j][k]
-    return imgnew
-
-
 def get_contour_pixel_number(img, points):
     """统计轮廓内部的像素个数
     Parameters:
@@ -43,11 +22,12 @@ def get_contour_pixel_number(img, points):
     return pixel_numbers
 
 
-def small_area_detection(file, maker_img, outpath, area_threshold, binary_threshold, debug=False):
+def small_area_detection(file, img, maker_img, outpath, area_threshold, binary_threshold, debug=False):
     """检测小面积区域
     Parameters:
         Input:
             file: 输入图片(带路径)
+            img: 输入的待处理的图片
             maker_img: 做了标记的图，检测结果写在该图上
             area_threshold: 轮廓中最小像素个数
             binary_threshold：二值化阈值
@@ -58,11 +38,6 @@ def small_area_detection(file, maker_img, outpath, area_threshold, binary_thresh
 
     (filepath, filename) = os.path.split(file)
     (onlyfilename, extension) = os.path.splitext(filename)
-
-    if file.endswith("png"):
-        img = inverse_white(file)
-    else:
-        img = cv2.imread(file)
 
     img_copy = copy.deepcopy(img)
     if len(img.shape) < 3:

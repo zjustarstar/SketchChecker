@@ -6,28 +6,6 @@ import numpy as np
 # binary_threshold = 50  # 二值化阈值
 
 
-def inverse_white(path):
-    # 输入为png的路径
-    # img = cv2.imread(path, -1)
-    img = cv2.imdecode(np.fromfile(path, dtype=np.uint8), -1)
-    if img.shape[2] == 3:
-        return img
-
-    for i in range(img.shape[0]):
-        for j in range(img.shape[1]):
-            if img[i][j][3] == 0:
-                img[i][j][0] = 255
-                img[i][j][1] = 255
-                img[i][j][2] = 255
-
-    imgnew = np.zeros((img.shape[0], img.shape[1], 3), np.uint8)
-    for k in range(3):
-        for i in range(img.shape[0]):
-            for j in range(img.shape[1]):
-                imgnew[i][j][k] = img[i][j][k]
-    return imgnew
-
-
 def get_contour_pixel_number(img, points):
     """统计轮廓内部的像素个数
     Parameters:
@@ -45,13 +23,13 @@ def get_contour_pixel_number(img, points):
     return pixel_numbers
 
 
-def thin_line_detection(file, outpath, binary_threshold, debug = False):
+def thin_line_detection(file, img,  outpath, debug = False):
     """检测细线
     Parameters:
         Input:
             file: 输入图片路径
+            img: 输入的图片
             outpath: 输出图片路径
-            binary_threshold：二值化阈值
             debug: 调试模式. 为True时会生成一些中间结果图
         Output:
             红色填充的图片和黑色填充的图片
@@ -59,10 +37,10 @@ def thin_line_detection(file, outpath, binary_threshold, debug = False):
     (filepath, filename) = os.path.split(file)
     (onlyfilename, extension) = os.path.splitext(filename)
 
-    if file.endswith("png"):
-        img = inverse_white(file)
-    else:
-        img = cv2.imread(file)
+    # if file.endswith("png"):
+    #     img = inverse_white(file)
+    # else:
+    #     img = cv2.imread(file)
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     #ret, binary = cv2.threshold(gray, binary_threshold, 255, cv2.THRESH_BINARY)

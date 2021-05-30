@@ -1,5 +1,6 @@
 import cv2
 import os
+import copy
 import numpy as np
 from skimage import morphology
 
@@ -153,12 +154,47 @@ def get_unclosed_pixel_points(binary, skeleton, solid_window_size, search_num):
     return temp_isolated_points
 
 
-def unclosed_line_detection(file, mark_img, outpath, binary_threshold=128,
+# 根据该点周边的信息来判断是否是未闭合的线
+def check_candidate_regions(points, binary):
+    if len(points) == 0:
+        return
+
+    new_points = copy.deepcopy(points)
+    binary[binary == 1] = 255
+
+    # 一定的半径范围内
+    radius = 8
+
+    w, h = binary.shape[0], binary.shape[1]
+    for pt in points:
+        left, right = max(pt[1]-radius, 0), min(pt[1]+radius, w-1)
+        up, dw = max(pt[0]-10, radius), min(pt[0]+radius, h-1)
+        roi_img = binary[up:dw, left:right]
+
+        #计算连通区域
+        contours, _ = cv2.findContours(roi_img, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+        regions1 = len(contours)
+        # 膨胀后再次计算连通区域
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))  # 定义结构元素的形状和大小
+        roi_img1 = cv2.dilate(roi_img, kernel)  # 膨胀
+        contours, _ = cv2.findContours(roi_img1, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+        regions2 = len(contours)
+
+        # 如果连通区域不会减少，则认为不存在未闭合区域
+        if regions1 == regions2:
+            new_points.remove(pt)
+
+        #cv2.imwrite("roi1.png", roi_img)
+    return new_points
+
+
+def unclosed_line_detection(file, img, mark_img, outpath, binary_threshold=128,
                             solid_window_size=7, search_num=20, debug=False):
     """
     Parameters:
         Input:
-            src_img_dir: 输入图片路径
+            src_img_dir: 输入图片路径及文件名
+            img: 输入的图片
             mark_img: 在该图上做标记
             binary_threshold：二值化阈值
             solid_window_size: 判断是否是实心区域的窗口大小
@@ -176,17 +212,16 @@ def unclosed_line_detection(file, mark_img, outpath, binary_threshold=128,
     # img = cv2.imdecode(np.fromfile(file, dtype=np.uint8), -1)
     # img = cv2.imread(file)
 
-    if file.endswith("png"):
-        img = inverse_white(file)
-    else:
-        img = cv2.imread(file)
-
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     _, binary = cv2.threshold(gray, binary_threshold, 255, cv2.THRESH_BINARY_INV)  # 二值化处理
     binary[binary == 255] = 1
     skeleton0 = morphology.skeletonize(binary)  # 骨架提取
     skeleton = skeleton0.astype(np.uint8) * 255
     points = get_unclosed_pixel_points(binary, skeleton, solid_window_size, search_num)  # 获取符合要求的点
+
+    # 去掉一些不可能的点
+    points = check_candidate_regions(points, binary)
+    print(points)
 
     for i in range(len(points)):
         cv2.circle(skeleton, (points[i][1], points[i][0]), 13, 255, 2)
