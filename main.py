@@ -24,18 +24,14 @@ def inverse_white(path):
     if img.shape[2] == 3:
         return img
 
-    for i in range(img.shape[0]):
-        for j in range(img.shape[1]):
-            if img[i][j][3] == 0:
-                img[i][j][0] = 255
-                img[i][j][1] = 255
-                img[i][j][2] = 255
+    # 将png透明背景改为255全白
+    img2 = np.reshape(img, (img.shape[0]*img.shape[1], img.shape[2]))
+    a = img2[:, 3] == 0
+    img2[a, 0:3] = 255
 
-    imgnew = np.zeros((img.shape[0], img.shape[1], 3), np.uint8)
-    for k in range(3):
-        for i in range(img.shape[0]):
-            for j in range(img.shape[1]):
-                imgnew[i][j][k] = img[i][j][k]
+    imgnew = img2[:, 0:3]
+    imgnew = np.reshape(imgnew, (img.shape[0], img.shape[1], 3))
+
     return imgnew
 
 
@@ -84,10 +80,10 @@ for f in imgfile:
     # 未闭合线头检测
     if ENABLE_UNCLOSED_LINE:
         print("开始未闭合线头检测")
-        maker_img = ud.unclosed_line_detection(f, img, maker_img, output_path, 128, 7, 20, debug)
+        maker_img, uc_num = ud.unclosed_line_detection(f, img, maker_img, output_path, 128, 7, 20, debug)
 
-    # 保存最终的maker图
-    dst_img_name = os.path.join(output_path, shotname + "_final" + extension)
+    # 保存最终的maker图, 并在结果图中标示uc的个数
+    dst_img_name = os.path.join(output_path, shotname + "_final_uc_" + str(uc_num) + extension)
     cv2.imencode(extension, maker_img)[1].tofile(dst_img_name)
 
 tend = time.time()

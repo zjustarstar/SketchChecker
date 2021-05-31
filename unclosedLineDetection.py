@@ -168,7 +168,7 @@ def check_candidate_regions(points, binary):
     w, h = binary.shape[0], binary.shape[1]
     for pt in points:
         left, right = max(pt[1]-radius, 0), min(pt[1]+radius, w-1)
-        up, dw = max(pt[0]-10, radius), min(pt[0]+radius, h-1)
+        up, dw = max(pt[0]-radius, radius), min(pt[0]+radius, h-1)
         roi_img = binary[up:dw, left:right]
 
         #计算连通区域
@@ -184,7 +184,6 @@ def check_candidate_regions(points, binary):
         if regions1 == regions2:
             new_points.remove(pt)
 
-        #cv2.imwrite("roi1.png", roi_img)
     return new_points
 
 
@@ -233,4 +232,4 @@ def unclosed_line_detection(file, img, mark_img, outpath, binary_threshold=128,
 
     print("  图片:", filename, "  不闭合点的个数为：", len(points))
 
-    return mark_img
+    return mark_img, len(points)
