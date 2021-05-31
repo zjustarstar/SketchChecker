@@ -222,14 +222,18 @@ def unclosed_line_detection(file, img, mark_img, outpath, binary_threshold=128,
     points = check_candidate_regions(points, binary)
     print(points)
 
-    for i in range(len(points)):
-        cv2.circle(skeleton, (points[i][1], points[i][0]), 13, 255, 2)
-        cv2.circle(mark_img, (points[i][1], points[i][0]), 13, (255, 0, 0), 2)
+    if points is not None:
+        for i in range(len(points)):
+            cv2.circle(skeleton, (points[i][1], points[i][0]), 13, 255, 2)
+            cv2.circle(mark_img, (points[i][1], points[i][0]), 13, (255, 0, 0), 2)
 
     if debug:
         mid_img_name = os.path.join(outpath, onlyfilename + "_ud_skeleton" + extension)
         cv2.imencode(extension, skeleton)[1].tofile(mid_img_name)
 
-    print("  图片:", filename, "  不闭合点的个数为：", len(points))
+    num = 0
+    if points is not None:
+        num = len(points)
+    print("  图片:", filename, "  不闭合点的个数为：", num)
 
-    return mark_img, len(points)
+    return mark_img, num
