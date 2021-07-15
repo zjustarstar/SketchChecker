@@ -8,39 +8,20 @@ from skimage import morphology
 # solid_window_size = 7  # 判断是否是实心区域的窗口大小
 # search_num = 20  # 沿着边缘节点反向往回搜索的次数 这个值越高，未闭合的线头检测的越干净
 
-def inverse_white(path):
-    # 输入为png的路径
-    img = cv2.imdecode(np.fromfile(path, dtype=np.uint8), -1)
-    # img = cv2.imread(path, -1)
-    if img.shape[2] == 3:
-        return img
 
-    for i in range(img.shape[0]):
-        for j in range(img.shape[1]):
-            if img[i][j][3] == 0:
-                img[i][j][0] = 255
-                img[i][j][1] = 255
-                img[i][j][2] = 255
-
-    imgnew = np.zeros((img.shape[0], img.shape[1], 3), np.uint8)
-    for k in range(3):
-        for i in range(img.shape[0]):
-            for j in range(img.shape[1]):
-                imgnew[i][j][k] = img[i][j][k]
-    return imgnew
-
-
-def is_solid_area(threshold_img, x, y, window_size=7):
+def is_solid_area(threshold_img, skeleton, x, y, window_size=7):
     """对于类似实心圆这样的区域进行骨架提取后也是一条线，因此可能存在误判.
        我们在原图二值化后的结果上检查该点window_size连通区域中白色点的个数,如果数目等于(window_size*window_size - 1)则一定是误判
         Parameters:
             Input:
                 threshold_img: 原图二值化反转后的结果
+                skeleton: 骨架图
                 x,y : 坐标值, x为行, y为列
                 window_size: 连通区域大小,数值尽量选用奇数
            Return:
                True or False
     """
+    # 第一种情况
     height, width = threshold_img.shape[0: 2]
     if (x-window_size//2) < 0 or (x+window_size//2) > height-1 or (y-window_size//2) < 0 or (y+window_size//2) > width-1:
         return True
@@ -50,8 +31,24 @@ def is_solid_area(threshold_img, x, y, window_size=7):
 
     if pixelNumbers == window_size*window_size-1:
         return True
-    else:
-        return False
+
+    # 第二种情况: 骨架化以后，变成了很短长度的一个小区域, 容易误判
+    # window = 4
+    # pt_num = 0  # 小范围区域，统计4*4边界上的骨架点
+    # row_start = max(0, x-window)
+    # row_end = min(x+window+1, height)
+    # col_start = max(0, y-window)
+    # col_end = min(y+window+1, width)
+    # for row in range(row_start, row_end):
+    #     for col in range(col_start, col_end):
+    #         # 统计边界上的骨架点数
+    #         if row==row_start or row==row_end-1 or col==col_start or col==col_end-1:
+    #             if skeleton[col][row] == 255:
+    #                 pt_num += 1
+    # if pt_num == 0:
+    #     return True
+
+    return False
 
 
 def calculate_surrouding_pixels(skeleton, x, y):
@@ -132,16 +129,20 @@ def get_unclosed_pixel_points(binary, skeleton, solid_window_size, search_num):
         if x not in range(1, height-1) or y not in range(1, width-1):
             point_neighbors[(x, y)] = None
             continue
+        # 计算x,y 八连通区域的非0像素
         neighbors = calculate_surrouding_pixels(skeleton, x, y)
         point_neighbors[(x, y)] = neighbors
 
         # 找出八连通区域邻居个数小于等于1的点
-        if len(neighbors) <= 1:
+        if len(neighbors) == 1:
             # 如果是类似于实心圆的封闭图形,排除
-            if is_solid_area(binary, x, y, solid_window_size):
+            if is_solid_area(binary, skeleton, x, y, solid_window_size):
                 continue
             else:
                 isolated_points.append((x, y))
+        # # 孤立点,去掉，否则可能影响后续计算
+        elif len(neighbors) == 0:
+            binary[x][y] = 0
 
     temp_isolated_points = isolated_points[:]
 
@@ -152,6 +153,21 @@ def get_unclosed_pixel_points(binary, skeleton, solid_window_size, search_num):
             temp_isolated_points.remove((x, y))
 
     return temp_isolated_points
+
+
+# 对于小区域中有单个黑点的四周全白的，直接去掉，变为白色
+def rm_single_pt(binary_img):
+    cols, rows = binary_img.shape[0], binary_img.shape[1]
+    binary_img[binary_img==255] = 1
+    for r in range(1, rows-1):
+        for c in range(1, cols-1):
+            # 一个黑点四周全是白的，则变为白的
+            if binary_img[c][r] == 0:
+                sum = binary_img[c-1][r] + binary_img[c+1][r] + binary_img[c][r-1] + binary_img[c][r+1]
+                if sum == 4:
+                    binary_img[c][r] = 1
+    binary_img[binary_img==1] = 255
+    return binary_img
 
 
 # 根据该点周边的信息来判断是否是未闭合的线
@@ -170,20 +186,46 @@ def check_candidate_regions(points, binary):
         left, right = max(pt[1]-radius, 0), min(pt[1]+radius, w-1)
         up, dw = max(pt[0]-radius, radius), min(pt[0]+radius, h-1)
         roi_img = binary[up:dw, left:right]
+        # 合法性判断
+        if up >= dw or left >= right:
+            continue
 
         #计算连通区域
         contours, _ = cv2.findContours(roi_img, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
         regions1 = len(contours)
+        # if pt[1] == 804:
+        #     cv2.imwrite("roi1.jpg", roi_img)
+            # print("regions1: c1={},c2={}".format(cv2.contourArea(contours[0]), cv2.contourArea(contours[1])))
         # 膨胀后再次计算连通区域
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))  # 定义结构元素的形状和大小
         roi_img1 = cv2.dilate(roi_img, kernel)  # 膨胀
-        contours, _ = cv2.findContours(roi_img1, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+        roi_img1 = rm_single_pt(roi_img1)
+        contours, _ = cv2.findContours(roi_img1, cv2.RETR_LIST, cv2. CHAIN_APPROX_NONE)
         regions2 = len(contours)
-
+        # if pt[1] == 804:
+        #     cv2.imwrite("roi2.jpg", roi_img1)
         # 如果连通区域不会减少，则认为不存在未闭合区域
-        if regions1 == regions2:
+        # 如果只有一个连通区域，也认为不存在未闭合区域
+        if regions1 == regions2 or regions1 == 1:
+            # print("pt={}, regions1={}, regions2={}".format(pt, regions1, regions2))
             new_points.remove(pt)
 
+    return new_points
+
+
+# 如果有两个点非常近，则从队列中删除一个
+def rm_dup_pts(points):
+    # 间隔阈值
+    dist = 5
+    new_points = copy.deepcopy(points)
+    for i in range(len(points)-1):
+        pt1 = points[i]
+        for j in range(i+1, len(points)):
+            pt2 = points[j]
+            d = [abs(pt1[0]-pt2[0]), abs(pt1[1]-pt2[1])]
+            if max(d) <= dist:
+                if pt2 in new_points:
+                    new_points.remove(pt2)
     return new_points
 
 
@@ -202,33 +244,43 @@ def unclosed_line_detection(file, img, mark_img, outpath, binary_threshold=128,
         Output:
             骨架图和原图的标注结果
     """
+    # 是否是彩色线框图
+    color_sketch = True
 
     (filepath, filename) = os.path.split(file)
     (onlyfilename, extension) = os.path.splitext(filename)
 
-
-    # imdecode/encode可以读取/保存含有中文名的文件
-    # img = cv2.imdecode(np.fromfile(file, dtype=np.uint8), -1)
-    # img = cv2.imread(file)
-
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, binary = cv2.threshold(gray, binary_threshold, 255, cv2.THRESH_BINARY_INV)  # 二值化处理
+    # cv2.imwrite(onlyfilename + ".jpg", gray)
+
+    if color_sketch:
+        _, binary = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY_INV)
+    else:
+        _, binary = cv2.threshold(gray, binary_threshold, 255, cv2.THRESH_BINARY_INV)  # 二值化处理
+
     binary[binary == 255] = 1
     skeleton0 = morphology.skeletonize(binary)  # 骨架提取
     skeleton = skeleton0.astype(np.uint8) * 255
     points = get_unclosed_pixel_points(binary, skeleton, solid_window_size, search_num)  # 获取符合要求的点
 
+    # 去掉非常近的重复点.比如一条直线中间断开,断开的两个点很近,就会都被列入
+    points = rm_dup_pts(points)
+
     # 去掉一些不可能的点
+    print(points)
     points = check_candidate_regions(points, binary)
     print(points)
 
     if points is not None:
         for i in range(len(points)):
-            cv2.circle(skeleton, (points[i][1], points[i][0]), 13, 255, 2)
-            cv2.circle(mark_img, (points[i][1], points[i][0]), 13, (255, 0, 0), 2)
+            cv2.circle(skeleton, (points[i][1], points[i][0]), 13, 255, 1)
+            cv2.circle(mark_img, (points[i][1], points[i][0]), 15, (0, 0, 255), 3)
 
     if debug:
-        mid_img_name = os.path.join(outpath, onlyfilename + "_ud_skeleton" + extension)
+        binary[binary == 1] = 255
+        binary_name = os.path.join(outpath, onlyfilename + "_uc_binary" + extension)
+        cv2.imencode(extension, binary)[1].tofile(binary_name)
+        mid_img_name = os.path.join(outpath, onlyfilename + "_uc_skeleton" + extension)
         cv2.imencode(extension, skeleton)[1].tofile(mid_img_name)
 
     num = 0

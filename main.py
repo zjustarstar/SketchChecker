@@ -5,6 +5,8 @@ import time
 import math
 import copy
 import numpy as np
+from PIL import Image
+import imgConverter as img_converter
 import smallAreaDetection as sd
 import thinLineDetection as td
 import unclosedLineDetection as ud
@@ -16,23 +18,6 @@ debug = False
 ENABLE_SMALL_AREA = False       # 小区域检测
 ENABLE_UNCLOSED_LINE = True     # 未闭合线头检测
 ENABLE_THIN_LINE = False        # 过细的线检测
-
-
-def inverse_white(path):
-    # 输入为png的路径
-    img = cv2.imdecode(np.fromfile(path, dtype=np.uint8), -1)
-    if img.shape[2] == 3:
-        return img
-
-    # 将png透明背景改为255全白
-    img2 = np.reshape(img, (img.shape[0]*img.shape[1], img.shape[2]))
-    a = img2[:, 3] == 0
-    img2[a, 0:3] = 255
-
-    imgnew = img2[:, 0:3]
-    imgnew = np.reshape(imgnew, (img.shape[0], img.shape[1], 3))
-
-    return imgnew
 
 
 input_path = "F:\\PythonProj\\SketchChecker\\testimage\\"
@@ -60,11 +45,10 @@ for f in imgfile:
     (shotname, extension) = os.path.splitext(filename)
     print("当前正在处理 %d/%d :%s" % (i, totalfile, filename))
 
-    # 读取图像
-    if f.endswith("png"):
-        img = inverse_white(f)
-    else:
-        img = cv2.imread(f)
+    img = Image.open(f)
+    newimg = img_converter.alpha_composite_with_color(img).convert('RGB')
+    img = cv2.cvtColor(np.asarray(newimg), cv2.COLOR_RGB2BGR)
+    # newimg.save(shotname+".jpg")
     maker_img = copy.deepcopy(img)
 
     # 细线化检测
@@ -80,7 +64,7 @@ for f in imgfile:
     # 未闭合线头检测
     if ENABLE_UNCLOSED_LINE:
         print("开始未闭合线头检测")
-        maker_img, uc_num = ud.unclosed_line_detection(f, img, maker_img, output_path, 128, 7, 20, debug)
+        maker_img, uc_num = ud.unclosed_line_detection(f, img, maker_img, output_path, 128, 7, 15, True)
 
     # 保存最终的maker图, 并在结果图中标示uc的个数
     dst_img_name = os.path.join(output_path, shotname + "_final_uc_" + str(uc_num) + extension)
