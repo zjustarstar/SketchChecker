@@ -229,23 +229,22 @@ def rm_dup_pts(points):
     return new_points
 
 
-def unclosed_line_detection(file, img, mark_img, outpath, binary_threshold=128,
-                            solid_window_size=7, search_num=20, debug=False):
+def unclosed_line_detection(file, img, mark_img, outpath, is_color_sketch=False, debug=False):
     """
     Parameters:
         Input:
             src_img_dir: 输入图片路径及文件名
             img: 输入的图片
             mark_img: 在该图上做标记
-            binary_threshold：二值化阈值
-            solid_window_size: 判断是否是实心区域的窗口大小
-            search_num: 沿着边缘节点反向往回搜索的次数
+            is_color_sketch：是否是彩色线框图,即使只有1条线用了彩色，也算彩色线框图
             debug: 调试模式,在该模式下，可以生成一些中间结果图
         Output:
             骨架图和原图的标注结果
     """
-    # 是否是彩色线框图
-    color_sketch = True
+    # 用于寻找未闭合点：判断是否是实心区域的窗口大小
+    solid_window_size = 7
+    # 用于寻找未闭合点：沿着边缘节点反向往回搜索的次数
+    search_num = 20
 
     (filepath, filename) = os.path.split(file)
     (onlyfilename, extension) = os.path.splitext(filename)
@@ -253,10 +252,11 @@ def unclosed_line_detection(file, img, mark_img, outpath, binary_threshold=128,
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     # cv2.imwrite(onlyfilename + ".jpg", gray)
 
-    if color_sketch:
-        _, binary = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY_INV)
-    else:
-        _, binary = cv2.threshold(gray, binary_threshold, 255, cv2.THRESH_BINARY_INV)  # 二值化处理
+    # 彩色线框图和黑白线框图采用不同阈值
+    threshold = 128
+    if is_color_sketch:
+        threshold = 220
+    _, binary = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY_INV)  # 二值化处理
 
     binary[binary == 255] = 1
     skeleton0 = morphology.skeletonize(binary)  # 骨架提取

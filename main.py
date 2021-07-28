@@ -14,6 +14,8 @@ import unclosedLineDetection as ud
 
 # 设为true时，会生成一些中间结果，方便调试程序
 debug = False
+# 是否是彩色线框图
+IS_COLOR_SKETCH = True
 # 检测功能的开关
 ENABLE_SMALL_AREA = False       # 小区域检测
 ENABLE_UNCLOSED_LINE = True     # 未闭合线头检测
@@ -22,10 +24,6 @@ ENABLE_THIN_LINE = False        # 过细的线检测
 
 input_path = "F:\\PythonProj\\SketchChecker\\testimage\\"
 output_folder = "result\\"
-# input_path = "/home/cgim/wushukai/code/LeXin/SketchChecker-0506/testimage"
-# output_folder = "result"
-# input_path = "/home/cgim/wushukai/code/LeXin/LineDetection/thinLineDetection/src"
-# output_folder = "result"
 
 # 在当前目录自动生成用于保存的文件夹
 if not os.path.exists(os.path.join(input_path, output_folder)):
@@ -64,10 +62,10 @@ for f in imgfile:
     # 未闭合线头检测
     if ENABLE_UNCLOSED_LINE:
         print("开始未闭合线头检测")
-        maker_img, uc_num = ud.unclosed_line_detection(f, img, maker_img, output_path, 128, 7, 15, True)
+        maker_img, uc_num = ud.unclosed_line_detection(f, img, maker_img, output_path, IS_COLOR_SKETCH, debug)
 
     # 保存最终的maker图, 并在结果图中标示uc的个数
-    dst_img_name = os.path.join(output_path, shotname + "_final_uc_" + str(uc_num) + extension)
+    dst_img_name = os.path.join(output_path, shotname + "_uc_" + str(uc_num) + extension)
     cv2.imencode(extension, maker_img)[1].tofile(dst_img_name)
 
 tend = time.time()
