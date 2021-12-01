@@ -8,19 +8,17 @@ import numpy as np
 from PIL import Image
 import imgConverter as img_converter
 import smallAreaDetection as sd
-import thinLineDetection as td
+import thinLineDetection_v2 as td
 import unclosedLineDetection as ud
-
 
 # 设为true时，会生成一些中间结果，方便调试程序
 debug = False
 # 是否是彩色线框图
 IS_COLOR_SKETCH = True
 # 检测功能的开关
-ENABLE_SMALL_AREA = False       # 小区域检测
-ENABLE_UNCLOSED_LINE = True     # 未闭合线头检测
-ENABLE_THIN_LINE = False        # 过细的线检测
-
+ENABLE_SMALL_AREA = False  # 小区域检测
+ENABLE_UNCLOSED_LINE = False  # 未闭合线头检测
+ENABLE_THIN_LINE = True  # 过细的线检测
 
 input_path = "F:\\PythonProj\\SketchChecker\\testimage\\"
 output_folder = "result\\"
@@ -38,7 +36,7 @@ i = 0
 output_path = os.path.join(input_path, output_folder)
 tstart = time.time()
 for f in imgfile:
-    i = i+1
+    i = i + 1
     (filepath, filename) = os.path.split(f)
     (shotname, extension) = os.path.splitext(filename)
     print("当前正在处理 %d/%d :%s" % (i, totalfile, filename))
@@ -48,11 +46,12 @@ for f in imgfile:
     img = cv2.cvtColor(np.asarray(newimg), cv2.COLOR_RGB2BGR)
     # newimg.save(shotname+".jpg")
     maker_img = copy.deepcopy(img)
-
+    uc_num = 0
     # 细线化检测
     if ENABLE_THIN_LINE:
         print("开始细线化检测")
-        maker_img = td.thin_line_detection(f, img, output_path, debug)
+        # thin_level越大，框选的线越细，一般取1~5
+        maker_img = td.thin_line_detection(f, img, output_path, debug, thin_level=1)
 
     # 小区域检测
     if ENABLE_SMALL_AREA:
