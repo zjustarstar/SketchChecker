@@ -171,7 +171,7 @@ def thin_line_detection(file, img, out_path, debug=False, thin_level=1):
     global SUSPICIOUS_THRESHOLD
     img = 255 - img[:, :, 0]
     SHAPE = img.shape
-    THRESHOLD = np.sqrt(np.max(img.shape)) / (9 + thin_level)
+    THRESHOLD = np.sqrt(np.max(img.shape)) / (10.2 + thin_level / 10)
     SUSPICIOUS_THRESHOLD = int(THRESHOLD * 1.4)
     STEP_LINE = int(np.max(img.shape) / 100)
 
