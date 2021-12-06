@@ -113,14 +113,14 @@ def output(img, points):
 #
 def get_suspicious_points(img):
     img_height, img_width = img.shape
-
+    BLACK_PIXEL = 0   # 黑色像素值
     suspicious_points = []
     for x in (range(100, img_height - 100, STEP_LINE)):
         start = 0
         end = 0
         centers = []
         for y in range(100, img_width - 100, STEP_PIXEL):
-            if img[x, y] > 0 and start == 0:
+            if img[x, y] > BLACK_PIXEL and start == 0:
                 start = y
             elif img[x, y] == 0 and start != 0:
                 end = y
@@ -135,7 +135,7 @@ def get_suspicious_points(img):
         end = 0
         centers = []
         for x in range(100, img_height - 100, STEP_PIXEL):
-            if img[x, y] > 0 and start == 0:
+            if img[x, y] > BLACK_PIXEL and start == 0:
                 start = x
             elif img[x, y] == 0 and start != 0:
                 end = x
@@ -163,22 +163,35 @@ def get_points(img, suspicious_points):
 #
 # 算法大步骤分为两步，先求可疑点，
 # 再从可疑点中筛选确切点
-#
-def thin_line_detection(file, img, out_path, debug=False, thin_level=1):
+def thin_line_detection(file, img, out_path, debug=False, delta=0):
+    '''
+    :param file: 输入的原文件名
+    :param img: 输入图像
+    :param out_path: 输出路径
+    :param debug: 为true时,会输出一些信息
+    :param delta: 增大或者缩小细线粗细的阈值。为正时，线的阈值增加，将有更多的线被检测到。
+                                              为负时，线的阈值降低，将有更少的线被检测到.
+    :return:
+    '''
     global THRESHOLD
     global SHAPE
     global STEP_LINE
     global SUSPICIOUS_THRESHOLD
+
     img = 255 - img[:, :, 0]
     SHAPE = img.shape
-    THRESHOLD = np.sqrt(np.max(img.shape)) / (10.2 + thin_level / 10)
+    # 10.3是经验值
+    THRESHOLD = np.sqrt(np.max(img.shape)) / 10.3 + delta
+    print('line_threshold=', THRESHOLD)
     SUSPICIOUS_THRESHOLD = int(THRESHOLD * 1.4)
     STEP_LINE = int(np.max(img.shape) / 100)
 
     suspicious_points = get_suspicious_points(img)
-    print('suspicious_points num:', len(suspicious_points))
-
     points = get_points(img, suspicious_points)
-    print('thin points num:', len(points))
+
+    if debug:
+        print('suspicious_points num:', len(suspicious_points))
+        print('thin points num:', len(points))
+
     return output(img, points)
     # return img
