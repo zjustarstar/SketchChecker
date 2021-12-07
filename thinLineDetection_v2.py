@@ -193,5 +193,5 @@ def thin_line_detection(file, img, out_path, debug=False, delta=0):
         print('suspicious_points num:', len(suspicious_points))
         print('thin points num:', len(points))
 
-    return output(img, points)
+    return output(img, points), len(points)
     # return img

@@ -11,13 +11,17 @@ import smallAreaDetection as sd
 import thinLineDetection_v2 as td
 import unclosedLineDetection as ud
 
+# 实际生产线上使用的图
+PRODUCT_IMG_SIZE = 2048
+
 # 设为true时，会生成一些中间结果，方便调试程序
 debug = False
 # 是否是彩色线框图
-IS_COLOR_SKETCH = True
+IS_COLOR_SKETCH = False
+
 # 检测功能的开关
 ENABLE_SMALL_AREA = False  # 小区域检测
-ENABLE_UNCLOSED_LINE = False  # 未闭合线头检测
+ENABLE_UNCLOSED_LINE = True  # 未闭合线头检测
 ENABLE_THIN_LINE = True  # 过细的线检测
 
 input_path = "F:\\PythonProj\\SketchChecker\\testimage\\"
@@ -44,15 +48,19 @@ for f in imgfile:
     img = Image.open(f)
     newimg = img_converter.alpha_composite_with_color(img).convert('RGB')
     img = cv2.cvtColor(np.asarray(newimg), cv2.COLOR_RGB2BGR)
-    # newimg.save(shotname+".jpg")
+
+    #结果文件中间名
+    middle_name = ''
     maker_img = copy.deepcopy(img)
-    uc_num = 0
+
     # 细线化检测
     if ENABLE_THIN_LINE:
         print("开始细线化检测")
         # delta控制线的粗细阈值,增减单元建议0.1。为正时，线的阈值增加，将有更多的线被检测到。
         # 为负时，线的阈值降低，将有更少的线被检测到.
-        maker_img = td.thin_line_detection(f, img, output_path, debug, delta=0)
+        maker_img, pt_num = td.thin_line_detection(f, img, output_path, debug, delta=0)
+        middle_name = "_tl_" + str(pt_num)
+        cv2.imwrite("tt.jpg", img)
 
     # 小区域检测
     if ENABLE_SMALL_AREA:
@@ -62,10 +70,16 @@ for f in imgfile:
     # 未闭合线头检测
     if ENABLE_UNCLOSED_LINE:
         print("开始未闭合线头检测")
+        # 实际使用的图片都是2048*2048
+        if img.shape[0] > PRODUCT_IMG_SIZE:
+            img = cv2.resize(img, (PRODUCT_IMG_SIZE, PRODUCT_IMG_SIZE))
+            maker_img = cv2.resize(maker_img, (PRODUCT_IMG_SIZE, PRODUCT_IMG_SIZE))
         maker_img, uc_num = ud.unclosed_line_detection(f, img, maker_img, output_path, IS_COLOR_SKETCH, debug)
+        middle_name = middle_name + "_uc_" + str(uc_num)
 
     # 保存最终的maker图, 并在结果图中标示uc的个数
-    dst_img_name = os.path.join(output_path, shotname + "_uc_" + str(uc_num) + extension)
+    dst_img_name = os.path.join(output_path, shotname + middle_name + extension)
+    print(dst_img_name)
     cv2.imencode(extension, maker_img)[1].tofile(dst_img_name)
 
 tend = time.time()
