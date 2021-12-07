@@ -21,7 +21,7 @@ IS_COLOR_SKETCH = False
 
 # 检测功能的开关
 ENABLE_SMALL_AREA = False  # 小区域检测
-ENABLE_UNCLOSED_LINE = True  # 未闭合线头检测
+ENABLE_UNCLOSED_LINE = False  # 未闭合线头检测
 ENABLE_THIN_LINE = True  # 过细的线检测
 
 input_path = "F:\\PythonProj\\SketchChecker\\testimage\\"
@@ -60,7 +60,6 @@ for f in imgfile:
         # 为负时，线的阈值降低，将有更少的线被检测到.
         maker_img, pt_num = td.thin_line_detection(f, img, output_path, debug, delta=0)
         middle_name = "_tl_" + str(pt_num)
-        cv2.imwrite("tt.jpg", img)
 
     # 小区域检测
     if ENABLE_SMALL_AREA:
