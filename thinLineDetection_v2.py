@@ -2,17 +2,20 @@ import cv2
 import os
 import numpy as np
 
-CIRCLE_MASK = cv2.imread('circle_mask.png')
-CIRCLE_MASK = CIRCLE_MASK[:, :, 0]
 
 THRESHOLD = 9
 SUSPICIOUS_THRESHOLD = 10
 
 THRESHOLD_ANGLE = 1
 STEP_LINE = 120
-STEP_ANGlE = 4
+STEP_ANGlE = 1
 STEP_PIXEL = 1
+BOX_SIZE = 10   # 截取的小块的大小
 SHAPE = (2048, 2048)
+
+CIRCLE_MASK = cv2.imread('circle_mask.png')
+CIRCLE_MASK = cv2.resize(CIRCLE_MASK, (BOX_SIZE*2, BOX_SIZE*2))
+CIRCLE_MASK = CIRCLE_MASK[:, :, 0]
 
 
 #
@@ -76,6 +79,7 @@ def get_black_wid(img):
 
 def mask_circle(img):
     img = np.bitwise_and(img, CIRCLE_MASK)
+
     return img
 
 
@@ -154,7 +158,7 @@ def get_suspicious_points(img):
 def get_points(img, suspicious_points):
     points = []
     for x, y in suspicious_points:
-        line_width = analyze_width(img[x - 15:x + 15, y - 15:y + 15])
+        line_width = analyze_width(img[x - BOX_SIZE:x + BOX_SIZE, y - BOX_SIZE:y + BOX_SIZE])
         if 0 < line_width < THRESHOLD:
             points.append([x, y])
     return points
@@ -188,6 +192,7 @@ def thin_line_detection(file, img, out_path, debug=False, delta=0):
 
     suspicious_points = get_suspicious_points(img)
     points = get_points(img, suspicious_points)
+    # points = suspicious_points
 
     if debug:
         print('suspicious_points num:', len(suspicious_points))
