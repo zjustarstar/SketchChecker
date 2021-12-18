@@ -28,6 +28,7 @@ def analyze_width_round_img(img):
     max_black_wid = 0
     max_black_angle = 0
     line_width = 0
+
     for angle in range(0, 180, STEP_ANGlE):
         rows, cols = img.shape
         rotate = cv2.getRotationMatrix2D((rows * 0.5, cols * 0.5), angle, 1)
@@ -38,7 +39,9 @@ def analyze_width_round_img(img):
             max_black_wid = black_wid
             max_black_angle = angle
             line_width = img.shape[0] - max_black_wid
-            if line_width < THRESHOLD:
+            delta = THRESHOLD_ANGLE * np.abs(np.sin(2 * max_black_angle / 180 * 3.1415926))
+
+            if line_width-delta < THRESHOLD:
                 break
 
     return line_width - THRESHOLD_ANGLE * np.abs(np.sin(2 * max_black_angle / 180 * 3.1415926))
@@ -87,7 +90,6 @@ def mask_circle(img):
 # analyze_width
 # 为了旋转后获取真实的宽度，要过滤旋转后会影响宽度判断的像素
 # 于是把图像用一个圆形mask处理后，输入analyze_width_round_img获取宽度
-#
 def analyze_width(img):
     img = mask_circle(img)
     line_width = analyze_width_round_img(img)
@@ -95,19 +97,12 @@ def analyze_width(img):
 
 
 def output(img, points):
-    r = 255 - img
-    g = 255 - img
-    b = 255 - img
-    o_r = int(np.max(SHAPE) / 200)
-    i_r = int(np.max(SHAPE) / 300)
-    for x, center in points:
-        g[x - o_r:x - i_r, center - o_r:center + o_r] = 0
-        g[x + i_r:x + o_r, center - o_r:center + o_r] = 0
-        g[x - o_r:x + o_r, center - o_r:center - i_r] = 0
-        g[x - o_r:x + o_r, center + i_r:center + o_r] = 0
-    # imgShow(cv2.merge([r, g, b]))
-    # cv2.imwrite(OUTPUT_PREFIX + filename, cv2.merge([r, g, b]))
-    return cv2.merge([r, g, b])
+    clr = (255, 0, 255)
+    w = 45
+    for p in points:
+        y, x = p[0], p[1]
+        cv2.rectangle(img, (x-w, y+w), (x+w, y-w), clr, 8)
+    return img
 
 
 #
@@ -118,56 +113,107 @@ def output(img, points):
 def get_suspicious_points(img):
     img_height, img_width = img.shape
     BLACK_PIXEL = 0   # 黑色像素值
+    MARGIN = 50        # 边界
     suspicious_points = []
-    for x in (range(100, img_height - 100, STEP_LINE)):
+    confirm_points = []
+    for x in (range(MARGIN, img_height - MARGIN, STEP_LINE)):
         start = 0
         end = 0
-        centers = []
-        for y in range(100, img_width - 100, STEP_PIXEL):
+        for y in range(MARGIN, img_width - MARGIN, STEP_PIXEL):
             if img[x, y] > BLACK_PIXEL and start == 0:
                 start = y
             elif img[x, y] == 0 and start != 0:
                 end = y
                 center = int((start + end) / 2)
-                if (end - start) < SUSPICIOUS_THRESHOLD:
-                    suspicious_points.append([x, center])
+                if THRESHOLD < (end - start) < SUSPICIOUS_THRESHOLD:
+                    suspicious_points.append([x, center, end-start])
+                if (end - start) <= THRESHOLD:
+                    confirm_points.append([x, center, end-start])
                 start = 0
                 end = 0
 
-    for y in (range(100, img_width - 100, STEP_LINE)):
+    for y in (range(MARGIN, img_width - MARGIN, STEP_LINE)):
         start = 0
         end = 0
-        centers = []
-        for x in range(100, img_height - 100, STEP_PIXEL):
+        for x in range(MARGIN, img_height - MARGIN, STEP_PIXEL):
             if img[x, y] > BLACK_PIXEL and start == 0:
                 start = x
             elif img[x, y] == 0 and start != 0:
                 end = x
                 center = int((start + end) / 2)
-                if (end - start) < SUSPICIOUS_THRESHOLD:
-                    suspicious_points.append([center, y])
+                if THRESHOLD < (end - start) < SUSPICIOUS_THRESHOLD:
+                    suspicious_points.append([center, y, end-start])
+                if (end - start) <= THRESHOLD:
+                    confirm_points.append([center, y, end - start])
                 start = 0
                 end = 0
-    return suspicious_points
+
+    return confirm_points, suspicious_points
 
 
 #
 # get_points
-# 在可疑点附近截取30*30的子图，输入到analyze_width函数判断真实宽度
-#
+# 在可疑点附近截取一定大小的子图，输入到analyze_width函数判断真实宽度
 def get_points(img, suspicious_points):
     points = []
-    for x, y in suspicious_points:
+    for p in suspicious_points:
+        x, y = p[0], p[1]
         line_width = analyze_width(img[x - BOX_SIZE:x + BOX_SIZE, y - BOX_SIZE:y + BOX_SIZE])
         if 0 < line_width < THRESHOLD:
-            points.append([x, y])
+            points.append([x, y, round(line_width, 2)])
+
     return points
 
+
+def isPointInRect(x, y, rect):
+    '''
+    判断点是否在某个rect内
+    :param x,y:
+    :param rect: x0, x1, y0, y1
+    :return:
+    '''
+    if rect[0] < x < rect[1] and rect[2] < y < rect[3]:
+        return True
+    else:
+        return False
+
+
+def remSinglePt(pts):
+    '''
+    去除孤立点:周边一定范围内一个点都没有的点
+    :param pts: 输入的点
+    :return: 去除孤立点后的点，以及去除了多少个点
+    '''
+    Scale = 2
+    newpt = []
+    for i in range(len(pts)):
+        y, x = pts[i][0], pts[i][1]
+        rect = [x-Scale*STEP_LINE, x+Scale*STEP_LINE, y-Scale*STEP_LINE, y+Scale*STEP_LINE]
+        num = 0
+        for p in pts:
+            if isPointInRect(p[1], p[0], rect):
+                num = num + 1
+
+        # 超过一个相邻点,保留
+        if num > 1:
+          newpt.append(pts[i])
+
+    return newpt, len(pts)-len(newpt)
+
+
+# 测试用，查看某些具体的线为何检测不到
+# p[0]是y
+def test_filter(points):
+    new_pts = []
+    for p in points:
+        if 0 < p[0] < 8534 * 0.2 and 0 < p[1] < 8534 * 0.4:
+            new_pts.append(p)
+    return new_pts
 
 #
 # 算法大步骤分为两步，先求可疑点，
 # 再从可疑点中筛选确切点
-def thin_line_detection(file, img, out_path, debug=False, delta=0):
+def thin_line_detection(file, img, out_path, debug=False, delta=0, isWallPaper=False):
     '''
     :param file: 输入的原文件名
     :param img: 输入图像
@@ -175,6 +221,8 @@ def thin_line_detection(file, img, out_path, debug=False, delta=0):
     :param debug: 为true时,会输出一些信息
     :param delta: 增大或者缩小细线粗细的阈值。为正时，线的阈值增加，将有更多的线被检测到。
                                               为负时，线的阈值降低，将有更少的线被检测到.
+    :param isWallPaper: 是否是壁纸类图，壁纸一般是比较长比较窄的长方形图.普通图阈值2px,
+                         壁纸类是1个像素;
     :return:
     '''
     global THRESHOLD
@@ -182,21 +230,36 @@ def thin_line_detection(file, img, out_path, debug=False, delta=0):
     global STEP_LINE
     global SUSPICIOUS_THRESHOLD
 
+    ori_img = img
     img = 255 - img[:, :, 0]
     SHAPE = img.shape
-    # 10.3是经验值
-    THRESHOLD = np.sqrt(np.max(img.shape)) / 10.3 + delta
+    # 1是经验值
+    THRESHOLD = 8 + delta
+    STEP_LINE = int(np.max(img.shape) / 100)
+    if isWallPaper:
+        THRESHOLD = 3 + delta
+        STEP_LINE = 10
     print('line_threshold=', THRESHOLD)
     SUSPICIOUS_THRESHOLD = int(THRESHOLD * 1.4)
-    STEP_LINE = int(np.max(img.shape) / 100)
 
-    suspicious_points = get_suspicious_points(img)
+    confirm_points, suspicious_points = get_suspicious_points(img)
     points = get_points(img, suspicious_points)
-    # points = suspicious_points
+    print('suspicious_points num:', len(suspicious_points))
+    print('point from suspicious:', len(points))
+    # 用于测试
+    # points = test_filter(points)
+    points, del_num = remSinglePt(points+confirm_points)
+    print('remove single point num:', del_num)
 
     if debug:
         print('suspicious_points num:', len(suspicious_points))
         print('thin points num:', len(points))
+        for i in range(len(points)):
+            print(points[i], end='')
+            # 每行显示10个点
+            if i % 10 == 0:
+                print('\n')
+        print("\n")
 
-    return output(img, points), len(points)
-    # return img
+    # 显示最终结果
+    return output(ori_img, points), len(points)

@@ -56,9 +56,9 @@ for f in imgfile:
     # 细线化检测
     if ENABLE_THIN_LINE:
         print("开始细线化检测")
-        # delta控制线的粗细阈值,增减单元建议0.1。为正时，线的阈值增加，将有更多的线被检测到。
+        # delta控制线的粗细阈值,增减单元建议0.05。为正时，线的阈值增加，将有更多的线被检测到。
         # 为负时，线的阈值降低，将有更少的线被检测到.
-        maker_img, pt_num = td.thin_line_detection(f, img, output_path, debug, delta=0.03)
+        maker_img, pt_num = td.thin_line_detection(f, img, output_path, False, delta=0, isWallPaper=False)
         middle_name = "_tl_" + str(pt_num)
 
     # 小区域检测
