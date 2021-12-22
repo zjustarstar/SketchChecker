@@ -98,10 +98,11 @@ def analyze_width(img):
 
 def output(img, points):
     clr = (255, 0, 255)
-    w = 45
+    w = int(np.max(img.shape) / 250)
+    thick = int(np.max(img.shape) / 1000)
     for p in points:
         y, x = p[0], p[1]
-        cv2.rectangle(img, (x-w, y+w), (x+w, y-w), clr, 8)
+        cv2.rectangle(img, (x-w, y+w), (x+w, y-w), clr, thick)
     return img
 
 
@@ -109,11 +110,13 @@ def output(img, points):
 # get_suspicious_points
 # 该函数通过一张图片获取图中可能为细线的可疑点，方法是分两次，横向和纵向遍历像素，
 # 遇到黑像素视为起点，离开黑像素视为重点，若起点与终点距离大于阈值，设两者中间点为可疑点
-#
-def get_suspicious_points(img):
+# isWallPaper是否是墙纸图，该图不是正方形的.
+def get_suspicious_points(img, isWallPaper):
     img_height, img_width = img.shape
     BLACK_PIXEL = 0   # 黑色像素值
     MARGIN = 50        # 边界
+    if isWallPaper:
+        MARGIN = 10
     suspicious_points = []
     confirm_points = []
     for x in (range(MARGIN, img_height - MARGIN, STEP_LINE)):
@@ -237,12 +240,12 @@ def thin_line_detection(file, img, out_path, debug=False, delta=0, isWallPaper=F
     THRESHOLD = 8 + delta
     STEP_LINE = int(np.max(img.shape) / 100)
     if isWallPaper:
-        THRESHOLD = 3 + delta
+        THRESHOLD = 2.0 + delta
         STEP_LINE = 10
     print('line_threshold=', THRESHOLD)
     SUSPICIOUS_THRESHOLD = int(THRESHOLD * 1.4)
 
-    confirm_points, suspicious_points = get_suspicious_points(img)
+    confirm_points, suspicious_points = get_suspicious_points(img, isWallPaper)
     points = get_points(img, suspicious_points)
     print('suspicious_points num:', len(suspicious_points))
     print('point from suspicious:', len(points))
