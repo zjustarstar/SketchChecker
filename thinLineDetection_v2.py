@@ -1,6 +1,8 @@
 import cv2
-import os
+import torch
+import time
 import numpy as np
+import train.thinline as cnnChecker
 
 
 THRESHOLD = 9
@@ -35,16 +37,18 @@ def analyze_width_round_img(img):
         rotated_img = cv2.warpAffine(img, rotate, (cols, rows))
         font_black_wid, end_black_wid = get_black_wid(rotated_img)
         black_wid = font_black_wid + end_black_wid
+        # 记录各个角度中黑色线段最窄的时候(对应black_wid最大)
         if black_wid > max_black_wid:
             max_black_wid = black_wid
             max_black_angle = angle
             line_width = img.shape[0] - max_black_wid
-            delta = THRESHOLD_ANGLE * np.abs(np.sin(2 * max_black_angle / 180 * 3.1415926))
+            # 1.08是经验值;
+            delta = THRESHOLD_ANGLE * np.abs(np.sin(2 * max_black_angle / 180 * 3.1415926)) * 1.08
 
             if line_width-delta < THRESHOLD:
                 break
 
-    return line_width - THRESHOLD_ANGLE * np.abs(np.sin(2 * max_black_angle / 180 * 3.1415926))
+    return line_width - THRESHOLD_ANGLE * np.abs(np.sin(2 * max_black_angle / 180 * 3.1415926)) * 1.08
 
 
 #
@@ -96,13 +100,39 @@ def analyze_width(img):
     return line_width
 
 
-def output(img, points):
-    clr = (255, 0, 255)
-    w = int(np.max(img.shape) / 250)
-    thick = int(np.max(img.shape) / 1000)
-    for p in points:
-        y, x = p[0], p[1]
-        cv2.rectangle(img, (x-w, y+w), (x+w, y-w), clr, thick)
+def output(model, img, gray, points):
+    # width = int(np.max(img.shape) / 250)
+    # thick = int(np.max(img.shape) / 1000)
+    width = 40
+    thick = 8
+
+    radius = 24
+    w, h = gray.shape[0], gray.shape[1]
+    for i in range(len(points)):
+        pt = points[i]
+        left, right = max(pt[1] - radius, 0), min(pt[1] + radius, w - 1)
+        up, dw = max(pt[0] - radius, radius), min(pt[0] + radius, h - 1)
+        if abs(up - dw) < radius - 1 or abs(left - right) < radius - 1:
+            continue
+
+        # 不同类型的点，选用不同的颜色
+        roi_img = gray[up:dw, left:right]
+        patch_type, confidence = cnnChecker.patchCheck(model, roi_img)
+
+        y, x = pt[0], pt[1]
+        clr = (255, 0, 255)
+        # broken
+        # if patch_type == 0:
+        #     clr = (255, 0, 0)
+        # # thick
+        # elif patch_type == 1:
+        #     clr = (0, 255, 0)
+        if patch_type <= 1:
+            continue
+        # thin1
+        if patch_type == 2:
+            clr = (0, 0, 255)
+        cv2.rectangle(img, (x-width, y+width), (x+width, y-width), clr, thick)
     return img
 
 
@@ -233,7 +263,15 @@ def thin_line_detection(file, img, out_path, debug=False, delta=0, isWallPaper=F
     global STEP_LINE
     global SUSPICIOUS_THRESHOLD
 
+    # 加载网络..
+    model = cnnChecker.myLeNet()
+    model.load_state_dict(torch.load("models\\thinline.pth"))
+
     ori_img = img
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # save_specified_region(img)
+
     img = 255 - img[:, :, 0]
     SHAPE = img.shape
     # 1是经验值
@@ -243,16 +281,22 @@ def thin_line_detection(file, img, out_path, debug=False, delta=0, isWallPaper=F
         THRESHOLD = 2.0 + delta
         STEP_LINE = 10
     print('line_threshold=', THRESHOLD)
+    # 乘以根号2(1.414)，表示最倾斜时的情况
     SUSPICIOUS_THRESHOLD = int(THRESHOLD * 1.4)
 
     confirm_points, suspicious_points = get_suspicious_points(img, isWallPaper)
     points = get_points(img, suspicious_points)
+    # points = suspicious_points
     print('suspicious_points num:', len(suspicious_points))
     print('point from suspicious:', len(points))
     # 用于测试
     # points = test_filter(points)
-    points, del_num = remSinglePt(points+confirm_points)
-    print('remove single point num:', del_num)
+    points = points + confirm_points
+    # points, del_num = remSinglePt(points)
+    # print('remove single point num:', del_num)
+
+    # 保存临时结果,用于训练
+    # save_temp_img(gray, points, 24)
 
     if debug:
         print('suspicious_points num:', len(suspicious_points))
@@ -265,4 +309,33 @@ def thin_line_detection(file, img, out_path, debug=False, delta=0, isWallPaper=F
         print("\n")
 
     # 显示最终结果
-    return output(ori_img, points), len(points)
+    return output(model, ori_img, gray, points), len(points)
+
+
+# 保存指定区域的图像，用于测试
+def save_specified_region(img):
+    left,top = 5100, 1300
+    right, bottom = 5800, 1800
+    roi_img = img[top:bottom, left:right]
+    cv2.imwrite("temp.png", roi_img)
+
+
+# 保存临时图像
+def save_temp_img(img, points, radius):
+    w, h = img.shape[0], img.shape[1]
+    for i in range(len(points)):
+        pt = points[i]
+        left, right = max(pt[1] - radius, 0), min(pt[1] + radius, w - 1)
+        up, dw = max(pt[0] - radius, radius), min(pt[0] + radius, h - 1)
+
+        if abs(up - dw) < radius - 1 or abs(left - right) < radius - 1:
+            return
+
+        roi_img = img[up:dw, left:right]
+
+        timestamp = time.strftime("_%Y%m%d_%H%M%S_", time.localtime())
+        filename = "temp\\" + timestamp + str(i) + ".jpg"
+        try:
+            cv2.imwrite(filename, roi_img)
+        except Exception as e:
+            print(e)

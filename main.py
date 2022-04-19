@@ -7,22 +7,22 @@ import copy
 import numpy as np
 from PIL import Image
 import imgConverter as img_converter
-import smallAreaDetection as sd
 import thinLineDetection_v2 as td
 import unclosedLineDetection as ud
+
 
 # 实际生产线上使用的图
 PRODUCT_IMG_SIZE = 2048
 
 # 设为true时，会生成一些中间结果，方便调试程序
-debug = False
+debug = True
 # 是否是彩色线框图
 IS_COLOR_SKETCH = False
 
 # 检测功能的开关
-ENABLE_SMALL_AREA = False  # 小区域检测
 ENABLE_UNCLOSED_LINE = False  # 未闭合线头检测
 ENABLE_THIN_LINE = True  # 过细的线检测
+# ENABLE_OVERHEAD_LINE = False  # 线头超出
 
 input_path = "F:\\PythonProj\\SketchChecker\\testimage\\"
 output_folder = "result\\"
@@ -36,6 +36,7 @@ imgfile2 = glob.glob(os.path.join(input_path, "*.jpg"))
 imgfile = imgfile1 + imgfile2
 totalfile = len(imgfile)
 
+
 i = 0
 output_path = os.path.join(input_path, output_folder)
 tstart = time.time()
@@ -46,7 +47,14 @@ for f in imgfile:
     print("当前正在处理 %d/%d :%s" % (i, totalfile, filename))
 
     img = Image.open(f)
-    newimg = img_converter.alpha_composite_with_color(img).convert('RGB')
+    # test = img.crop((550, 1300, 1200, 1900))
+    # test.save("tt.png")
+    if len(img.getbands()) == 4:
+        newimg = img_converter.alpha_composite_with_color(img).convert('RGB')
+    elif len(img.getbands()) == 3:
+        newimg = img
+    else:
+        print("image format error")
     img = cv2.cvtColor(np.asarray(newimg), cv2.COLOR_RGB2BGR)
 
     #结果文件中间名
@@ -59,13 +67,8 @@ for f in imgfile:
         # delta控制线的粗细阈值,增减单元建议0.05。为正时，线的阈值增加，将有更多的线被检测到。
         # 为负时，线的阈值降低，将有更少的线被检测到.
         # isWallPaper表示输入的是墙纸图.
-        maker_img, pt_num = td.thin_line_detection(f, img, output_path, False, delta=0, isWallPaper=True)
+        maker_img, pt_num = td.thin_line_detection(f, img, output_path, False, delta=0, isWallPaper=False)
         middle_name = "_tl_" + str(pt_num)
-
-    # 小区域检测
-    if ENABLE_SMALL_AREA:
-        print("开始小区域检测")
-        maker_img = sd.small_area_detection(f, img, maker_img, output_path, 20, 50, debug)
 
     # 未闭合线头检测
     if ENABLE_UNCLOSED_LINE:
@@ -76,6 +79,11 @@ for f in imgfile:
             maker_img = cv2.resize(maker_img, (PRODUCT_IMG_SIZE, PRODUCT_IMG_SIZE))
         maker_img, uc_num = ud.unclosed_line_detection(f, img, maker_img, output_path, IS_COLOR_SKETCH, debug)
         middle_name = middle_name + "_uc_" + str(uc_num)
+
+    # 线头超出检测
+    # if ENABLE_OVERHEAD_LINE:
+    #     print("开始线头超出检测")
+    #     maker_img, uc_num = od.overhead_line_detection(f, img, maker_img, output_path, IS_COLOR_SKETCH, debug)
 
     # 保存最终的maker图, 并在结果图中标示uc的个数
     dst_img_name = os.path.join(output_path, shotname + middle_name + extension)

@@ -1,8 +1,12 @@
 import cv2
 import os
 import copy
+import time
+import torch
 import numpy as np
+from tqdm import tqdm
 from skimage import morphology
+import train.brokenline as cnnChecker
 
 # binary_threshold = 128  # 二值化阈值
 # solid_window_size = 7  # 判断是否是实心区域的窗口大小
@@ -124,7 +128,7 @@ def get_unclosed_pixel_points(binary, skeleton, solid_window_size, search_num):
     none_zero_point_lists = list(zip(*np.nonzero(skeleton)))  # 获取骨架图中非0元素的点
 
     # 第一次过滤
-    for i in range(len(none_zero_point_lists)):
+    for i in tqdm(range(len(none_zero_point_lists))):
         x, y = none_zero_point_lists[i][0], none_zero_point_lists[i][1]
         if x not in range(1, height-1) or y not in range(1, width-1):
             point_neighbors[(x, y)] = None
@@ -216,7 +220,7 @@ def check_candidate_regions(points, binary):
 # 如果有两个点非常近，则从队列中删除一个
 def rm_dup_pts(points):
     # 间隔阈值
-    dist = 5
+    dist = 10
     new_points = copy.deepcopy(points)
     for i in range(len(points)-1):
         pt1 = points[i]
@@ -241,13 +245,18 @@ def unclosed_line_detection(file, img, mark_img, outpath, is_color_sketch=False,
         Output:
             骨架图和原图的标注结果
     """
-    # 用于寻找未闭合点：判断是否是实心区域的窗口大小
-    solid_window_size = 7
-    # 用于寻找未闭合点：沿着边缘节点反向往回搜索的次数
-    search_num = 20
-
+    model_name = "models\\brokenline.pth"
     (filepath, filename) = os.path.split(file)
     (onlyfilename, extension) = os.path.splitext(filename)
+
+    # 加载判别网络
+    if not os.path.exists(model_name):
+        print("模型文件不存在")
+        return
+
+    # 加载网络..
+    model = cnnChecker.myLeNet()
+    model.load_state_dict(torch.load(model_name))
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     # cv2.imwrite(onlyfilename + ".jpg", gray)
@@ -261,6 +270,10 @@ def unclosed_line_detection(file, img, mark_img, outpath, is_color_sketch=False,
     binary[binary == 255] = 1
     skeleton0 = morphology.skeletonize(binary)  # 骨架提取
     skeleton = skeleton0.astype(np.uint8) * 255
+    # 用于寻找未闭合点：判断是否是实心区域的窗口大小
+    solid_window_size = 7
+    # 用于寻找未闭合点：沿着边缘节点反向往回搜索的次数
+    search_num = 20
     points = get_unclosed_pixel_points(binary, skeleton, solid_window_size, search_num)  # 获取符合要求的点
 
     # 去掉非常近的重复点.比如一条直线中间断开,断开的两个点很近,就会都被列入
@@ -274,7 +287,35 @@ def unclosed_line_detection(file, img, mark_img, outpath, is_color_sketch=False,
     if points is not None:
         for i in range(len(points)):
             cv2.circle(skeleton, (points[i][1], points[i][0]), 13, 255, 1)
-            cv2.circle(mark_img, (points[i][1], points[i][0]), 15, (0, 0, 255), 3)
+
+            pt = points[i]
+            radius = 14
+            w, h = gray.shape[0], gray.shape[1]
+            left, right = max(pt[1] - radius, 0), min(pt[1] + radius, w - 1)
+            up, dw = max(pt[0] - radius, radius), min(pt[0] + radius, h - 1)
+            if abs(up - dw) < radius - 1 or abs(left - right) < radius - 1:
+                continue
+
+            # 不同类型的点，选用不同的颜色
+            roi_img = gray[up:dw, left:right]
+            patch_type, confidence = cnnChecker.patchCheck(model, roi_img)
+            print("patch type:%d, confidence=%.2f" % (patch_type, confidence))
+            clr = (0, 0, 255)
+            # thinline
+            if patch_type == 3:
+                clr = (0, 255, 0)
+            # multi-lines
+            elif patch_type == 0 and confidence>0.85:
+                clr = (255, 0, 0)
+            # point
+            elif patch_type == 1:
+                clr = (255, 255, 0)
+            # R-shape
+            elif patch_type == 2:
+                clr = (255, 0, 255)
+            cv2.circle(mark_img, (points[i][1], points[i][0]), 15, clr, 3)
+
+            # save_temp_img(gray, points[i], 14, i)
 
     if debug:
         binary[binary == 1] = 255
@@ -289,3 +330,23 @@ def unclosed_line_detection(file, img, mark_img, outpath, is_color_sketch=False,
     print("  图片:", filename, "  不闭合点的个数为：", num)
 
     return mark_img, num
+
+
+# 保存临时图像
+def save_temp_img(img, pt, radius, i):
+    w, h = img.shape[0], img.shape[1]
+    left, right = max(pt[1] - radius, 0), min(pt[1] + radius, w - 1)
+    up, dw = max(pt[0] - radius, radius), min(pt[0] + radius, h - 1)
+
+    if abs(up - dw) < radius - 1 or abs(left - right) < radius - 1:
+        return
+
+    roi_img = img[up:dw, left:right]
+
+    timestamp = time.strftime("_%Y%m%d_%H%M%S_", time.localtime())
+    filename = "temp\\" + timestamp + str(i) + ".jpg"
+    try:
+        cv2.imwrite(filename, roi_img)
+    except Exception as e:
+        print(e)
+
