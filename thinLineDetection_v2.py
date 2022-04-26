@@ -12,7 +12,7 @@ THRESHOLD_ANGLE = 1
 STEP_LINE = 120
 STEP_ANGlE = 1
 STEP_PIXEL = 1
-BOX_SIZE = 10   # 截取的小块的大小
+BOX_SIZE = 9   # 截取的小块的大小
 SHAPE = (2048, 2048)
 
 CIRCLE_MASK = cv2.imread('circle_mask.png')
@@ -51,7 +51,6 @@ def analyze_width_round_img(img):
     return line_width - THRESHOLD_ANGLE * np.abs(np.sin(2 * max_black_angle / 180 * 3.1415926)) * 1.08
 
 
-#
 # get_black_wid
 # 输入图像内容为竖直线段
 # 计算图像的第二维向量和，
@@ -98,6 +97,19 @@ def analyze_width(img):
     img = mask_circle(img)
     line_width = analyze_width_round_img(img)
     return line_width
+
+
+def output_wallpaper(img, points):
+    width = int(np.max(img.shape) / 250)
+    thick = int(np.max(img.shape) / 1000)
+
+    for i in range(len(points)):
+        pt = points[i]
+        y, x = pt[0], pt[1]
+        clr = (0, 0, 255)
+        cv2.rectangle(img, (x - width, y + width), (x + width, y - width), clr, thick)
+
+    return img
 
 
 def output(model, img, gray, points):
@@ -291,9 +303,9 @@ def thin_line_detection(file, img, out_path, debug=False, delta=0, isWallPaper=F
     print('point from suspicious:', len(points))
     # 用于测试
     # points = test_filter(points)
+    points, del_num = remSinglePt(points)
     points = points + confirm_points
-    # points, del_num = remSinglePt(points)
-    # print('remove single point num:', del_num)
+    print('remove single point num:', del_num)
 
     # 保存临时结果,用于训练
     # save_temp_img(gray, points, 24)
@@ -308,14 +320,17 @@ def thin_line_detection(file, img, out_path, debug=False, delta=0, isWallPaper=F
                 print('\n')
         print("\n")
 
+    if isWallPaper:
+        return output_wallpaper(ori_img, points), len(points)
+
     # 显示最终结果
     return output(model, ori_img, gray, points), len(points)
 
 
 # 保存指定区域的图像，用于测试
 def save_specified_region(img):
-    left,top = 5100, 1300
-    right, bottom = 5800, 1800
+    left,top = 1100, 4400
+    right, bottom = 1400, 4900
     roi_img = img[top:bottom, left:right]
     cv2.imwrite("temp.png", roi_img)
 

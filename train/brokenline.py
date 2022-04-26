@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 import PIL.Image as Image
 import os
 
-TARGET_CLASS = 5
+TARGET_CLASS = 4
 MODEL_NAME = "..\\models\\brokenline.pth"
 
 
@@ -17,6 +17,7 @@ MODEL_NAME = "..\\models\\brokenline.pth"
 def load_data(batch_size=15, display=False):
     t = [transforms.RandomHorizontalFlip(),
          transforms.RandomVerticalFlip(),
+         transforms.RandomRotation(40),
          transforms.RandomRotation(20)]
     trans = transforms.Compose([
         transforms.Grayscale(),
@@ -105,9 +106,9 @@ def test_FashionNet():
 
 
 def train_FashionData():
-    lr = 0.05
-    epoch = 400
-    batch_size = 15
+    lr = 0.01
+    epoch = 200
+    batch_size = 50
 
     train_iter = load_data(batch_size)
     use_gpu = torch.cuda.is_available()

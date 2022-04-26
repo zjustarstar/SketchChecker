@@ -20,8 +20,8 @@ debug = True
 IS_COLOR_SKETCH = False
 
 # 检测功能的开关
-ENABLE_UNCLOSED_LINE = False  # 未闭合线头检测
-ENABLE_THIN_LINE = True  # 过细的线检测
+ENABLE_UNCLOSED_LINE = True  # 未闭合线头检测
+ENABLE_THIN_LINE = False  # 过细的线检测
 # ENABLE_OVERHEAD_LINE = False  # 线头超出
 
 input_path = "F:\\PythonProj\\SketchChecker\\testimage\\"
@@ -67,7 +67,7 @@ for f in imgfile:
         # delta控制线的粗细阈值,增减单元建议0.05。为正时，线的阈值增加，将有更多的线被检测到。
         # 为负时，线的阈值降低，将有更少的线被检测到.
         # isWallPaper表示输入的是墙纸图.
-        maker_img, pt_num = td.thin_line_detection(f, img, output_path, False, delta=0, isWallPaper=False)
+        maker_img, pt_num = td.thin_line_detection(f, img, output_path, False, delta=0, isWallPaper=True)
         middle_name = "_tl_" + str(pt_num)
 
     # 未闭合线头检测

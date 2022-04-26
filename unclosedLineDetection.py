@@ -201,7 +201,7 @@ def check_candidate_regions(points, binary):
         #     cv2.imwrite("roi1.jpg", roi_img)
             # print("regions1: c1={},c2={}".format(cv2.contourArea(contours[0]), cv2.contourArea(contours[1])))
         # 膨胀后再次计算连通区域
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))  # 定义结构元素的形状和大小
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))  # 定义结构元素的形状和大小
         roi_img1 = cv2.dilate(roi_img, kernel)  # 膨胀
         roi_img1 = rm_single_pt(roi_img1)
         contours, _ = cv2.findContours(roi_img1, cv2.RETR_LIST, cv2. CHAIN_APPROX_NONE)
@@ -273,7 +273,7 @@ def unclosed_line_detection(file, img, mark_img, outpath, is_color_sketch=False,
     # 用于寻找未闭合点：判断是否是实心区域的窗口大小
     solid_window_size = 7
     # 用于寻找未闭合点：沿着边缘节点反向往回搜索的次数
-    search_num = 20
+    search_num = 10
     points = get_unclosed_pixel_points(binary, skeleton, solid_window_size, search_num)  # 获取符合要求的点
 
     # 去掉非常近的重复点.比如一条直线中间断开,断开的两个点很近,就会都被列入
@@ -284,6 +284,7 @@ def unclosed_line_detection(file, img, mark_img, outpath, is_color_sketch=False,
     points = check_candidate_regions(points, binary)
     print(points)
 
+    real_pt = 0
     if points is not None:
         for i in range(len(points)):
             cv2.circle(skeleton, (points[i][1], points[i][0]), 13, 255, 1)
@@ -300,20 +301,24 @@ def unclosed_line_detection(file, img, mark_img, outpath, is_color_sketch=False,
             roi_img = gray[up:dw, left:right]
             patch_type, confidence = cnnChecker.patchCheck(model, roi_img)
             print("patch type:%d, confidence=%.2f" % (patch_type, confidence))
+            # 边界区域
+            if patch_type == -1:
+                continue
+
             clr = (0, 0, 255)
-            # thinline
-            if patch_type == 3:
-                clr = (0, 255, 0)
-            # multi-lines
-            elif patch_type == 0 and confidence>0.85:
-                clr = (255, 0, 0)
-            # point
-            elif patch_type == 1:
-                clr = (255, 255, 0)
-            # R-shape
-            elif patch_type == 2:
-                clr = (255, 0, 255)
-            cv2.circle(mark_img, (points[i][1], points[i][0]), 15, clr, 3)
+            # # thinline
+            # if patch_type == 2:
+            #     clr = (0, 255, 0)
+            # # multi-lines
+            # elif patch_type == 0:
+            #     clr = (255, 0, 0)
+            # # point
+            # elif patch_type == 1:
+            #     clr = (255, 255, 0)
+            if patch_type < 3:
+                continue
+            real_pt += 1
+            cv2.circle(mark_img, (points[i][1], points[i][0]), 15, clr, 2)
 
             # save_temp_img(gray, points[i], 14, i)
 
@@ -324,12 +329,9 @@ def unclosed_line_detection(file, img, mark_img, outpath, is_color_sketch=False,
         mid_img_name = os.path.join(outpath, onlyfilename + "_uc_skeleton" + extension)
         cv2.imencode(extension, skeleton)[1].tofile(mid_img_name)
 
-    num = 0
-    if points is not None:
-        num = len(points)
-    print("  图片:", filename, "  不闭合点的个数为：", num)
+    print("  图片:", filename, "  不闭合点的个数为：", real_pt)
 
-    return mark_img, num
+    return mark_img, real_pt
 
 
 # 保存临时图像

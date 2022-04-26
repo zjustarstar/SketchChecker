@@ -102,7 +102,7 @@ def test_FashionNet():
 
 def train_FashionData():
     lr = 0.01
-    epoch = 300
+    epoch = 600
     batch_size = 30
 
     train_iter = load_data(batch_size)
