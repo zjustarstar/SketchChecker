@@ -185,7 +185,7 @@ def check_candidate_regions(points, binary):
     # 一定的半径范围内
     radius = 8
 
-    w, h = binary.shape[0], binary.shape[1]
+    h, w = binary.shape[0], binary.shape[1]
     for pt in points:
         left, right = max(pt[1]-radius, 0), min(pt[1]+radius, w-1)
         up, dw = max(pt[0]-radius, radius), min(pt[0]+radius, h-1)
@@ -284,14 +284,16 @@ def unclosed_line_detection(file, img, mark_img, outpath, is_color_sketch=False,
     points = check_candidate_regions(points, binary)
     print(points)
 
+    len_points = 0
     real_pt = 0
     if points is not None:
+        len_points = len(points)
         for i in range(len(points)):
             cv2.circle(skeleton, (points[i][1], points[i][0]), 13, 255, 1)
 
             pt = points[i]
             radius = 14
-            w, h = gray.shape[0], gray.shape[1]
+            h, w = gray.shape[0], gray.shape[1]
             left, right = max(pt[1] - radius, 0), min(pt[1] + radius, w - 1)
             up, dw = max(pt[0] - radius, radius), min(pt[0] + radius, h - 1)
             if abs(up - dw) < radius - 1 or abs(left - right) < radius - 1:
@@ -322,6 +324,7 @@ def unclosed_line_detection(file, img, mark_img, outpath, is_color_sketch=False,
 
             # save_temp_img(gray, points[i], 14, i)
 
+
     if debug:
         binary[binary == 1] = 255
         binary_name = os.path.join(outpath, onlyfilename + "_uc_binary" + extension)
@@ -329,14 +332,14 @@ def unclosed_line_detection(file, img, mark_img, outpath, is_color_sketch=False,
         mid_img_name = os.path.join(outpath, onlyfilename + "_uc_skeleton" + extension)
         cv2.imencode(extension, skeleton)[1].tofile(mid_img_name)
 
-    print("  图片:", filename, "  不闭合点的个数为：", real_pt)
+    print("  图片:", filename, " 未筛选前个数:", len_points, "  筛选后不闭合点的个数为：", real_pt)
 
     return mark_img, real_pt
 
 
 # 保存临时图像
 def save_temp_img(img, pt, radius, i):
-    w, h = img.shape[0], img.shape[1]
+    h, w = img.shape[0], img.shape[1]
     left, right = max(pt[1] - radius, 0), min(pt[1] + radius, w - 1)
     up, dw = max(pt[0] - radius, radius), min(pt[0] + radius, h - 1)
 

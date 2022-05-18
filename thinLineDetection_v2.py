@@ -103,13 +103,23 @@ def output_wallpaper(img, points):
     width = int(np.max(img.shape) / 250)
     thick = int(np.max(img.shape) / 1000)
 
+    h, w = img.shape[0], img.shape[1]
+    final_pts = 0
     for i in range(len(points)):
         pt = points[i]
+
+        # 越界检测
+        if pt[1] - width < 0 or pt[0]-width < 0 or \
+                pt[1]+width > w-1 or pt[0]+width > h-1:
+            continue
+
         y, x = pt[0], pt[1]
         clr = (0, 0, 255)
         cv2.rectangle(img, (x - width, y + width), (x + width, y - width), clr, thick)
 
-    return img
+        final_pts += 1
+
+    return img, final_pts
 
 
 def output(model, img, gray, points):
@@ -119,33 +129,49 @@ def output(model, img, gray, points):
     thick = 8
 
     radius = 24
-    w, h = gray.shape[0], gray.shape[1]
+    h, w = gray.shape[0], gray.shape[1]
+    final_pts = 0
     for i in range(len(points)):
         pt = points[i]
-        left, right = max(pt[1] - radius, 0), min(pt[1] + radius, w - 1)
-        up, dw = max(pt[0] - radius, radius), min(pt[0] + radius, h - 1)
-        if abs(up - dw) < radius - 1 or abs(left - right) < radius - 1:
+
+        # 越界检测
+        if pt[1] - radius < 0 or pt[0]-radius < 0 or \
+                pt[1]+radius > w-1 or pt[0]+radius > h-1:
             continue
+
+        left, right = max(pt[1] - radius, 0), min(pt[1] + radius, w - 1)
+        up, dw = max(pt[0] - radius, 0), min(pt[0] + radius, h - 1)
+        # if abs(up - dw) < radius - 1 or abs(left - right) < radius - 1:
+        #     continue
 
         # 不同类型的点，选用不同的颜色
         roi_img = gray[up:dw, left:right]
         patch_type, confidence = cnnChecker.patchCheck(model, roi_img)
 
+        # 超出区域范围
+        if patch_type == -1:
+            continue
+
         y, x = pt[0], pt[1]
-        clr = (255, 0, 255)
+        clr = (125, 125, 125)
         # broken
         # if patch_type == 0:
-        #     clr = (255, 0, 0)
+        #     clr = (0, 0, 0)
         # # thick
         # elif patch_type == 1:
-        #     clr = (0, 255, 0)
+        #     clr = (0, 0, 0)
         if patch_type <= 1:
             continue
         # thin1
-        if patch_type == 2:
+        elif patch_type == 2:
             clr = (0, 0, 255)
+        elif patch_type == 3:
+            clr = (255, 0, 255)
         cv2.rectangle(img, (x-width, y+width), (x+width, y-width), clr, thick)
-    return img
+
+        final_pts += 1
+
+    return img, final_pts
 
 
 #
@@ -321,10 +347,10 @@ def thin_line_detection(file, img, out_path, debug=False, delta=0, isWallPaper=F
         print("\n")
 
     if isWallPaper:
-        return output_wallpaper(ori_img, points), len(points)
+        return output_wallpaper(ori_img, points)
 
     # 显示最终结果
-    return output(model, ori_img, gray, points), len(points)
+    return output(model, ori_img, gray, points)
 
 
 # 保存指定区域的图像，用于测试

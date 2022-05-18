@@ -1,97 +1,38 @@
 import glob
 import os
-import cv2
 import time
 import math
-import copy
-import numpy as np
-from PIL import Image
-import imgConverter as img_converter
-import thinLineDetection_v2 as td
-import unclosedLineDetection as ud
+import main_process as mp
 
 
-# 实际生产线上使用的图
-PRODUCT_IMG_SIZE = 2048
-
-# 设为true时，会生成一些中间结果，方便调试程序
-debug = True
-# 是否是彩色线框图
-IS_COLOR_SKETCH = False
-
-# 检测功能的开关
-ENABLE_UNCLOSED_LINE = True  # 未闭合线头检测
-ENABLE_THIN_LINE = False  # 过细的线检测
-# ENABLE_OVERHEAD_LINE = False  # 线头超出
-
-input_path = "F:\\PythonProj\\SketchChecker\\testimage\\"
-output_folder = "result\\"
+input_path = "F:\\PythonProj\\SketchChecker\\testpdf\\"
+output_folder = os.path.join(input_path, "result")
 
 # 在当前目录自动生成用于保存的文件夹
-if not os.path.exists(os.path.join(input_path, output_folder)):
-    os.makedirs(os.path.join(input_path, output_folder))
+if not os.path.exists(output_folder):
+    os.makedirs(output_folder)
 
-imgfile1 = glob.glob(os.path.join(input_path, "*.png"))
-imgfile2 = glob.glob(os.path.join(input_path, "*.jpg"))
-imgfile = imgfile1 + imgfile2
+imgfile = glob.glob(os.path.join(input_path, "*.pdf"))
 totalfile = len(imgfile)
 
-
 i = 0
-output_path = os.path.join(input_path, output_folder)
 tstart = time.time()
 for f in imgfile:
     i = i + 1
-    (filepath, filename) = os.path.split(f)
+
+    # convert to png image
+    print("start to convert pdf to png image")
+    pngImg, isWallPaper = mp.pdf2image(f)
+    (filepath, filename) = os.path.split(pngImg)
     (shotname, extension) = os.path.splitext(filename)
     print("当前正在处理 %d/%d :%s" % (i, totalfile, filename))
+    mp.main_checker(pngImg, output_folder, isWallPaper)
 
-    img = Image.open(f)
-    # test = img.crop((550, 1300, 1200, 1900))
-    # test.save("tt.png")
-    if len(img.getbands()) == 4:
-        newimg = img_converter.alpha_composite_with_color(img).convert('RGB')
-    elif len(img.getbands()) == 3:
-        newimg = img
-    else:
-        print("image format error")
-    img = cv2.cvtColor(np.asarray(newimg), cv2.COLOR_RGB2BGR)
-
-    #结果文件中间名
-    middle_name = ''
-    maker_img = copy.deepcopy(img)
-
-    # 细线化检测
-    if ENABLE_THIN_LINE:
-        print("开始细线化检测")
-        # delta控制线的粗细阈值,增减单元建议0.05。为正时，线的阈值增加，将有更多的线被检测到。
-        # 为负时，线的阈值降低，将有更少的线被检测到.
-        # isWallPaper表示输入的是墙纸图.
-        maker_img, pt_num = td.thin_line_detection(f, img, output_path, False, delta=0, isWallPaper=True)
-        middle_name = "_tl_" + str(pt_num)
-
-    # 未闭合线头检测
-    if ENABLE_UNCLOSED_LINE:
-        print("开始未闭合线头检测")
-        # 实际使用的图片都是2048*2048
-        if img.shape[0] > PRODUCT_IMG_SIZE:
-            img = cv2.resize(img, (PRODUCT_IMG_SIZE, PRODUCT_IMG_SIZE))
-            maker_img = cv2.resize(maker_img, (PRODUCT_IMG_SIZE, PRODUCT_IMG_SIZE))
-        maker_img, uc_num = ud.unclosed_line_detection(f, img, maker_img, output_path, IS_COLOR_SKETCH, debug)
-        middle_name = middle_name + "_uc_" + str(uc_num)
-
-    # 线头超出检测
-    # if ENABLE_OVERHEAD_LINE:
-    #     print("开始线头超出检测")
-    #     maker_img, uc_num = od.overhead_line_detection(f, img, maker_img, output_path, IS_COLOR_SKETCH, debug)
-
-    # 保存最终的maker图, 并在结果图中标示uc的个数
-    dst_img_name = os.path.join(output_path, shotname + middle_name + extension)
-    print(dst_img_name)
-    cv2.imencode(extension, maker_img)[1].tofile(dst_img_name)
+    # 将临时生成的png图像删除
+    if os.path.exists(pngImg):
+        os.remove(pngImg)
 
 tend = time.time()
-
 timespan = tend - tstart
 hour = math.floor(timespan / 3600)
 m = math.floor((timespan - hour * 3600) / 60)
