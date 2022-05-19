@@ -1,6 +1,7 @@
 import cv2
 import torch
 import time
+import copy
 import numpy as np
 import train.thinline as cnnChecker
 
@@ -305,7 +306,7 @@ def thin_line_detection(file, img, out_path, debug=False, delta=0, isWallPaper=F
     model = cnnChecker.myLeNet()
     model.load_state_dict(torch.load("models\\thinline.pth"))
 
-    ori_img = img
+    ori_img = copy.deepcopy(img)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     # save_specified_region(img)

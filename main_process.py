@@ -19,7 +19,7 @@ debug = False
 IS_COLOR_SKETCH = False
 
 # 检测功能的开关
-ENABLE_UNCLOSED_LINE = False  # 未闭合线头检测
+ENABLE_UNCLOSED_LINE = True  # 未闭合线头检测
 ENABLE_THIN_LINE = True # 过细的线检测
 
 
@@ -27,7 +27,7 @@ def pdf2image(pdfPath):
     square_size = 8534
     wallpaper_size = 3125
     # 是正方形的还是wallpaper
-    isSquare = True
+    isWallPaper = False
 
     (filepath, filename) = os.path.split(pdfPath)
     (shotname, extension) = os.path.splitext(filename)
@@ -44,7 +44,7 @@ def pdf2image(pdfPath):
             zoom_ratio = square_size / r.width
         else:
             zoom_ratio = wallpaper_size / r.width
-            isSquare = False
+            isWallPaper = True
 
         # 设置缩放和旋转系数
         trans = fitz.Matrix(zoom_ratio, zoom_ratio)
@@ -54,7 +54,7 @@ def pdf2image(pdfPath):
         pm.save(save_file)
 
     pdf.close()
-    return save_file, isSquare
+    return save_file, isWallPaper
 
 
 def main_checker(imgPath, outpath, isWallPaper):
@@ -87,10 +87,6 @@ def main_checker(imgPath, outpath, isWallPaper):
         print("image format error")
     img = cv2.cvtColor(np.asarray(newimg), cv2.COLOR_RGB2BGR)
 
-    # 结果文件中间名
-    middle_name = ''
-    maker_img = copy.deepcopy(img)
-
     dst_img_thin = dst_img_uc = " "
     # 细线化检测
     if ENABLE_THIN_LINE:
@@ -114,9 +110,8 @@ def main_checker(imgPath, outpath, isWallPaper):
             ratio = min(img.shape[0], img.shape[1]) / PRODUCT_IMG_SIZE
             newh, neww = math.floor(img.shape[0] / ratio), math.floor(img.shape[1] / ratio)
             input_img = cv2.resize(img, (neww, newh))
-            maker_img = cv2.resize(maker_img, (neww, newh))
-        maker_img, uc_num = ud.unclosed_line_detection(imgPath, input_img, maker_img, blpath, IS_COLOR_SKETCH, debug)
-        middle_name = middle_name + "_" + str(uc_num)
+        maker_img, uc_num = ud.unclosed_line_detection(imgPath, input_img, blpath, IS_COLOR_SKETCH, debug)
+        middle_name = "_" + str(uc_num)
 
         # 保存最终的maker图, 并在结果图中标示uc的个数
         dst_img_uc = os.path.join(blpath, shotname + middle_name + extension)

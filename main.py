@@ -26,7 +26,8 @@ for f in imgfile:
     (filepath, filename) = os.path.split(pngImg)
     (shotname, extension) = os.path.splitext(filename)
     print("当前正在处理 %d/%d :%s" % (i, totalfile, filename))
-    mp.main_checker(pngImg, output_folder, isWallPaper)
+    # 开始处理。返回的dst_img_thin和dst_img_uc分别是生成的细线检测和断线检测结果图
+    dst_img_thin, dst_img_uc = mp.main_checker(pngImg, output_folder, isWallPaper)
 
     # 将临时生成的png图像删除
     if os.path.exists(pngImg):

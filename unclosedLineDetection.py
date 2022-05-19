@@ -233,13 +233,12 @@ def rm_dup_pts(points):
     return new_points
 
 
-def unclosed_line_detection(file, img, mark_img, outpath, is_color_sketch=False, debug=False):
+def unclosed_line_detection(file, img, outpath, is_color_sketch=False, debug=False):
     """
     Parameters:
         Input:
             src_img_dir: 输入图片路径及文件名
             img: 输入的图片
-            mark_img: 在该图上做标记
             is_color_sketch：是否是彩色线框图,即使只有1条线用了彩色，也算彩色线框图
             debug: 调试模式,在该模式下，可以生成一些中间结果图
         Output:
@@ -320,7 +319,7 @@ def unclosed_line_detection(file, img, mark_img, outpath, is_color_sketch=False,
             if patch_type < 3:
                 continue
             real_pt += 1
-            cv2.circle(mark_img, (points[i][1], points[i][0]), 15, clr, 2)
+            cv2.circle(img, (points[i][1], points[i][0]), 15, clr, 2)
 
             # save_temp_img(gray, points[i], 14, i)
 
@@ -334,7 +333,7 @@ def unclosed_line_detection(file, img, mark_img, outpath, is_color_sketch=False,
 
     print("  图片:", filename, " 未筛选前个数:", len_points, "  筛选后不闭合点的个数为：", real_pt)
 
-    return mark_img, real_pt
+    return img, real_pt
 
 
 # 保存临时图像
