@@ -342,7 +342,7 @@ def thin_line_detection(file, img, out_path, debug=False, delta=0, zoomratio=4, 
 
     # 加载网络..
     if not os.path.exists("models\\thinline.pth"):
-        print("fail to load model")
+        print("fail to load thinline model")
         return None, 0
 
     model = cnnChecker.myLeNet()
