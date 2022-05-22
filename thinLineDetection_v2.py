@@ -1,6 +1,7 @@
 import cv2
 import torch
 import time
+import os
 import copy
 import numpy as np
 import train.thinline as cnnChecker
@@ -90,7 +91,6 @@ def mask_circle(img):
     return img
 
 
-#
 # analyze_width
 # 为了旋转后获取真实的宽度，要过滤旋转后会影响宽度判断的像素
 # 于是把图像用一个圆形mask处理后，输入analyze_width_round_img获取宽度
@@ -100,23 +100,60 @@ def analyze_width(img):
     return line_width
 
 
-def output_wallpaper(img, points):
-    width = int(np.max(img.shape) / 250)
+def output_wallpaper(model, img, gray, points):
+    width = int(np.max(img.shape) / 400)
     thick = int(np.max(img.shape) / 1000)
 
     h, w = img.shape[0], img.shape[1]
     final_pts = 0
+    radius = 24
     for i in range(len(points)):
         pt = points[i]
 
+        # # 越界检测
+        # if pt[1] - width < 0 or pt[0]-width < 0 or \
+        #         pt[1]+width > w-1 or pt[0]+width > h-1:
+        #     continue
+
         # 越界检测
-        if pt[1] - width < 0 or pt[0]-width < 0 or \
-                pt[1]+width > w-1 or pt[0]+width > h-1:
+        if pt[1] - radius < 0 or pt[0] - radius < 0 or \
+                pt[1] + radius > w - 1 or pt[0] + radius > h - 1:
+            continue
+
+        left, right = max(pt[1] - radius, 0), min(pt[1] + radius, w - 1)
+        up, dw = max(pt[0] - radius, 0), min(pt[0] + radius, h - 1)
+
+        # 不同类型的点，选用不同的颜色
+        roi_img = gray[up:dw, left:right]
+        patch_type, confidence = cnnChecker.patchCheck(model, roi_img)
+
+        # 超出区域范围
+        if patch_type == -1:
             continue
 
         y, x = pt[0], pt[1]
         clr = (0, 0, 255)
+        # # broken
+        # if patch_type == 0 and confidence > 0.9:
+        #     clr = (255, 0, 0)
+        # # # thick
+        # elif patch_type == 1:
+        #     clr = (0, 255, 0)
+        if patch_type == 1:
+            continue
+        # 这里还有误判，所以将置信度高的剔除
+        elif patch_type == 0 and confidence > 0.9:
+            continue
+        # thin1
+        elif patch_type == 2:
+            clr = (0, 0, 255)
+        elif patch_type == 3:
+            clr = (255, 0, 255)
         cv2.rectangle(img, (x - width, y + width), (x + width, y - width), clr, thick)
+
+        # y, x = pt[0], pt[1]
+        # clr = (0, 0, 255)
+        # cv2.rectangle(img, (x - width, y + width), (x + width, y - width), clr, thick)
 
         final_pts += 1
 
@@ -157,10 +194,10 @@ def output(model, img, gray, points):
         clr = (125, 125, 125)
         # broken
         # if patch_type == 0:
-        #     clr = (0, 0, 0)
+        #     clr = (255, 0, 0)
         # # thick
         # elif patch_type == 1:
-        #     clr = (0, 0, 0)
+        #     clr = (0, 255, 0)
         if patch_type <= 1:
             continue
         # thin1
@@ -285,7 +322,7 @@ def test_filter(points):
 #
 # 算法大步骤分为两步，先求可疑点，
 # 再从可疑点中筛选确切点
-def thin_line_detection(file, img, out_path, debug=False, delta=0, isWallPaper=False):
+def thin_line_detection(file, img, out_path, debug=False, delta=0, zoomratio=4, isWallPaper=False):
     '''
     :param file: 输入的原文件名
     :param img: 输入图像
@@ -293,6 +330,7 @@ def thin_line_detection(file, img, out_path, debug=False, delta=0, isWallPaper=F
     :param debug: 为true时,会输出一些信息
     :param delta: 增大或者缩小细线粗细的阈值。为正时，线的阈值增加，将有更多的线被检测到。
                                               为负时，线的阈值降低，将有更少的线被检测到.
+    :param zoomratio: pdf->png的缩放比例
     :param isWallPaper: 是否是壁纸类图，壁纸一般是比较长比较窄的长方形图.普通图阈值2px,
                          壁纸类是1个像素;
     :return:
@@ -303,6 +341,10 @@ def thin_line_detection(file, img, out_path, debug=False, delta=0, isWallPaper=F
     global SUSPICIOUS_THRESHOLD
 
     # 加载网络..
+    if not os.path.exists("models\\thinline.pth"):
+        print("fail to load model")
+        return None, 0
+
     model = cnnChecker.myLeNet()
     model.load_state_dict(torch.load("models\\thinline.pth"))
 
@@ -313,26 +355,31 @@ def thin_line_detection(file, img, out_path, debug=False, delta=0, isWallPaper=F
 
     img = 255 - img[:, :, 0]
     SHAPE = img.shape
-    # 1是经验值
-    THRESHOLD = 8 + delta
+    # 正方形的原pdf尺寸多为2048，发现此时参数为8最佳
+    THRESHOLD = 2*int(zoomratio) + delta
     STEP_LINE = int(np.max(img.shape) / 100)
     if isWallPaper:
-        THRESHOLD = 2.0 + delta
-        STEP_LINE = 10
+        THRESHOLD = int(zoomratio) + delta
+        STEP_LINE = 30
     print('line_threshold=', THRESHOLD)
     # 乘以根号2(1.414)，表示最倾斜时的情况
     SUSPICIOUS_THRESHOLD = int(THRESHOLD * 1.4)
 
     confirm_points, suspicious_points = get_suspicious_points(img, isWallPaper)
     points = get_points(img, suspicious_points)
-    # points = suspicious_points
     print('suspicious_points num:', len(suspicious_points))
     print('point from suspicious:', len(points))
     # 用于测试
     # points = test_filter(points)
+    # 在suspicious point中去除单独点
     points, del_num = remSinglePt(points)
+
     points = points + confirm_points
-    print('remove single point num:', del_num)
+    # 对于wallpaper，孤立点去除相对比较鲁棒
+    # 而且更加密集，可以在confirm点中去除
+    if isWallPaper:
+        points, del_num = remSinglePt(points)
+        print('remove single point num:', del_num)
 
     # 保存临时结果,用于训练
     # save_temp_img(gray, points, 24)
@@ -348,7 +395,7 @@ def thin_line_detection(file, img, out_path, debug=False, delta=0, isWallPaper=F
         print("\n")
 
     if isWallPaper:
-        return output_wallpaper(ori_img, points)
+        return output_wallpaper(model, ori_img, gray, points)
 
     # 显示最终结果
     return output(model, ori_img, gray, points)

@@ -250,8 +250,8 @@ def unclosed_line_detection(file, img, outpath, is_color_sketch=False, debug=Fal
 
     # 加载判别网络
     if not os.path.exists(model_name):
-        print("模型文件不存在")
-        return
+        print("fail to load brokenline model")
+        return None, 0
 
     # 加载网络..
     model = cnnChecker.myLeNet()
@@ -301,7 +301,7 @@ def unclosed_line_detection(file, img, outpath, is_color_sketch=False, debug=Fal
             # 不同类型的点，选用不同的颜色
             roi_img = gray[up:dw, left:right]
             patch_type, confidence = cnnChecker.patchCheck(model, roi_img)
-            print("patch type:%d, confidence=%.2f" % (patch_type, confidence))
+            # print("patch type:%d, confidence=%.2f" % (patch_type, confidence))
             # 边界区域
             if patch_type == -1:
                 continue

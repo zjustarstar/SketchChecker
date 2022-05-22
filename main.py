@@ -21,13 +21,16 @@ for f in imgfile:
     i = i + 1
 
     # convert to png image
-    print("start to convert pdf to png image")
-    pngImg, isWallPaper = mp.pdf2image(f)
+    print("\n start to convert pdf to png image")
+    pngImg, isWallPaper, zoom_ratio = mp.pdf2image(f)
     (filepath, filename) = os.path.split(pngImg)
     (shotname, extension) = os.path.splitext(filename)
     print("当前正在处理 %d/%d :%s" % (i, totalfile, filename))
     # 开始处理。返回的dst_img_thin和dst_img_uc分别是生成的细线检测和断线检测结果图
-    dst_img_thin, dst_img_uc = mp.main_checker(pngImg, output_folder, isWallPaper)
+    dst_img_thin, dst_img_uc = mp.main_checker(pngImg, output_folder, isWallPaper, zoom_ratio)
+    if dst_img_uc is None or dst_img_uc is None:
+        print("something wrong!!")
+        break
 
     # 将临时生成的png图像删除
     if os.path.exists(pngImg):

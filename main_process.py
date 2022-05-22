@@ -20,7 +20,7 @@ IS_COLOR_SKETCH = False
 
 # 检测功能的开关
 ENABLE_UNCLOSED_LINE = True  # 未闭合线头检测
-ENABLE_THIN_LINE = True # 过细的线检测
+ENABLE_THIN_LINE = True  # 过细的线检测
 
 
 def pdf2image(pdfPath):
@@ -54,15 +54,16 @@ def pdf2image(pdfPath):
         pm.save(save_file)
 
     pdf.close()
-    return save_file, isWallPaper
+    return save_file, isWallPaper, zoom_ratio
 
 
-def main_checker(imgPath, outpath, isWallPaper):
+def main_checker(imgPath, outpath, isWallPaper, zoom_ratio):
     '''
     根据输入的图像检测断点和细线
     :param imgPath: 输入的图像的路径
     :param outpath: 保存检测结果的路径
     :param isWallPaper: 输入的图像是正方形图还是墙纸图，后者长宽不一样
+    :param zoom_ratio: pdf->png图像的缩放比例
     :return:
     '''
     (filepath, filename) = os.path.split(imgPath)
@@ -94,7 +95,11 @@ def main_checker(imgPath, outpath, isWallPaper):
         # delta控制线的粗细阈值,增减单元建议0.05。为正时，线的阈值增加，将有更多的线被检测到。
         # 为负时，线的阈值降低，将有更少的线被检测到.
         # isWallPaper表示输入的是墙纸图.
-        maker_img, pt_num = td.thin_line_detection(imgPath, img, tlpath, False, delta=0, isWallPaper=isWallPaper)
+        maker_img, pt_num = td.thin_line_detection(imgPath, img, tlpath, False,
+                                                   delta=0, zoomratio=zoom_ratio, isWallPaper=isWallPaper)
+        if maker_img is None:
+            return None, None
+
         middle_name = "_" + str(pt_num)
 
         # 保存最终的maker图, 并在结果图中标示uc的个数
@@ -112,6 +117,9 @@ def main_checker(imgPath, outpath, isWallPaper):
             input_img = cv2.resize(img, (neww, newh))
         maker_img, uc_num = ud.unclosed_line_detection(imgPath, input_img, blpath, IS_COLOR_SKETCH, debug)
         middle_name = "_" + str(uc_num)
+
+        if maker_img is None:
+            return None, None
 
         # 保存最终的maker图, 并在结果图中标示uc的个数
         dst_img_uc = os.path.join(blpath, shotname + middle_name + extension)
