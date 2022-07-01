@@ -128,9 +128,11 @@ def get_unclosed_pixel_points(binary, skeleton, solid_window_size, search_num):
     none_zero_point_lists = list(zip(*np.nonzero(skeleton)))  # 获取骨架图中非0元素的点
 
     # 第一次过滤
+    x_limit = height - 1
+    y_limit = width - 1
     for i in tqdm(range(len(none_zero_point_lists))):
         x, y = none_zero_point_lists[i][0], none_zero_point_lists[i][1]
-        if x not in range(1, height-1) or y not in range(1, width-1):
+        if not (1 <= x < x_limit) or not (1 <= y < y_limit):
             point_neighbors[(x, y)] = None
             continue
         # 计算x,y 八连通区域的非0像素
@@ -233,13 +235,13 @@ def rm_dup_pts(points):
     return new_points
 
 
-def unclosed_line_detection(file, img, outpath, is_color_sketch=False, debug=False):
+def unclosed_line_detection(file, img, outpath, thinline_num, debug=False):
     """
     Parameters:
         Input:
             src_img_dir: 输入图片路径及文件名
             img: 输入的图片
-            is_color_sketch：是否是彩色线框图,即使只有1条线用了彩色，也算彩色线框图
+            thinline_num：图中细线点个数; 个数过多时, 二值化参数要更大
             debug: 调试模式,在该模式下，可以生成一些中间结果图
         Output:
             骨架图和原图的标注结果
@@ -260,10 +262,12 @@ def unclosed_line_detection(file, img, outpath, is_color_sketch=False, debug=Fal
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     # cv2.imwrite(onlyfilename + ".jpg", gray)
 
-    # 彩色线框图和黑白线框图采用不同阈值
+    # 有很多细线的图，与常规的线框图不同，需要采用不同阈值
+    # 过多细线会严重影响二值化结果
     threshold = 128
-    if is_color_sketch:
-        threshold = 220
+    if thinline_num>1200:
+        print("use multiple thin lines model")
+        threshold = 240
     _, binary = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY_INV)  # 二值化处理
 
     binary[binary == 255] = 1
